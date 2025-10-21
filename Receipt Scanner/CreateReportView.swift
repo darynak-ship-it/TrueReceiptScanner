@@ -2,183 +2,278 @@
 //  CreateReportView.swift
 //  Receipt Scanner
 //
-//  Created by AI Assistant on 10/20/25.
+//  Created by AI Assistant on 10/16/25.
 //
 
 import SwiftUI
 
-private enum SortOption: String, CaseIterable, Identifiable { case date = "📆Date", category = "🗂️Category", tag = "🏷️Tag", payment = "💳Payment"; var id: String { rawValue } }
-private enum ExportFormat: String, CaseIterable, Identifiable { case pdf = "🔺PDF", excel = "🟢Excel", csv = "🟨CSV"; var id: String { rawValue } }
-
 struct CreateReportView: View {
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var reportName: String = ""
-    @State private var sortBy: SortOption = .date
-    @State private var exportFormat: ExportFormat = .pdf
-    @State private var attachReceipts: Bool = false
-    @State private var showAddExpenses: Bool = false
-    @State private var selectedExpenseIds: Set<UUID> = []
-    @State private var showPreview: Bool = false
-    @State private var previewText: String = ""
-    @State private var showShare: Bool = false
-    @State private var shareURL: URL? = nil
-
+    let onCancel: () -> Void
+    
+    @State private var selectedReceipts: Set<UUID> = []
+    @State private var reportFormat: ReportFormat = .pdf
+    @State private var showShareSheet = false
+    @State private var shareItems: [Any] = []
+    @State private var isGenerating = false
+    @State private var showAlert = false
+    @State private var alertMessage = ""
+    
+    enum ReportFormat: String, CaseIterable {
+        case pdf = "PDF"
+        case csv = "CSV"
+        case excel = "Excel"
+        
+        var fileExtension: String {
+            switch self {
+            case .pdf: return "pdf"
+            case .csv: return "csv"
+            case .excel: return "xlsx"
+            }
+        }
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section {
-                    TextField("Report name", text: $reportName)
+        NavigationStack {
+            VStack(spacing: 20) {
+                // Header
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Create Report")
+                        .font(.largeTitle.bold())
+                    Text("Select receipts and choose format")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-
-                Section("PROPERTIES") {
-                    NavigationLink {
-                        OptionsListView(title: "Sort by", options: SortOption.allCases.map { $0.rawValue }, selected: sortBy.rawValue) { chosen in
-                            sortBy = SortOption.allCases.first { $0.rawValue == chosen } ?? .date
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                
+                // Format Selection
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Report Format")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    HStack(spacing: 16) {
+                        ForEach(ReportFormat.allCases, id: \.self) { format in
+                            Button(action: { reportFormat = format }) {
+                                VStack(spacing: 8) {
+                                    Image(systemName: formatIcon(for: format))
+                                        .font(.title2)
+                                        .foregroundColor(reportFormat == format ? .white : .accentColor)
+                                    
+                                    Text(format.rawValue)
+                                        .font(.subheadline)
+                                        .foregroundColor(reportFormat == format ? .white : .primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(reportFormat == format ? Color.accentColor : Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(12)
+                            }
+                            .buttonStyle(.plain)
                         }
-                    } label: {
-                        HStack { Text("Sort by"); Spacer(); Text(sortBy.rawValue).foregroundColor(.green) }
                     }
-
-                    NavigationLink {
-                        OptionsListView(title: "Export format", options: ExportFormat.allCases.map { $0.rawValue }, selected: exportFormat.rawValue) { chosen in
-                            exportFormat = ExportFormat.allCases.first { $0.rawValue == chosen } ?? .pdf
+                    .padding(.horizontal)
+                }
+                
+                // Receipt Selection
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Select Receipts")
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Button(selectedReceipts.count == allReceipts.count ? "Deselect All" : "Select All") {
+                            if selectedReceipts.count == allReceipts.count {
+                                selectedReceipts.removeAll()
+                            } else {
+                                selectedReceipts = Set(allReceipts.map { $0.id })
+                            }
                         }
-                    } label: {
-                        HStack { Text("Export format"); Spacer(); Text(exportFormat.rawValue).foregroundColor(.green) }
+                        .font(.subheadline)
+                        .foregroundColor(.accentColor)
                     }
-
-                    Toggle("Attach receipts", isOn: $attachReceipts)
-                }
-
-                Section("INCLUDED EXPENSES") {
-                    Button {
-                        showAddExpenses = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "plus.circle.fill").foregroundColor(.green)
-                            Text("Add Expenses")
+                    .padding(.horizontal)
+                    
+                    if allReceipts.isEmpty {
+                        EmptyReceiptsView()
+                    } else {
+                        List(allReceipts) { receipt in
+                            ReceiptSelectionRow(
+                                receipt: receipt,
+                                isSelected: selectedReceipts.contains(receipt.id),
+                                onToggle: { toggleReceipt(receipt.id) }
+                            )
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
+                        .listStyle(.plain)
+                        .frame(maxHeight: 300)
                     }
                 }
-            }
-
-            HStack {
-                Button(action: openPreview) {
-                    Text("Preview")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(12)
-                }
-                Button(action: openShare) {
-                    HStack { Image(systemName: "square.and.arrow.up"); Text("Send") }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                }
-            }
-            .padding()
-        }
-        .navigationTitle("Generate Report")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button("Back") { dismiss() } }
-            ToolbarItem(placement: .topBarTrailing) { Button("Save") { dismiss() } }
-        }
-        .sheet(isPresented: $showAddExpenses) {
-            NavigationStack { MultiselectExpensesView(selected: $selectedExpenseIds) }
-                .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showPreview) {
-            NavigationStack {
-                VStack {
-                    Text("Preview (\(exportFormat.rawValue))").font(.headline)
-                    ScrollView { Text(previewText).padding() }
-                }
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back") { showPreview = false } } }
-            }
-            .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showShare) {
-            if let url = shareURL { ShareSheet(activityItems: [url]) }
-        }
-        .onDisappear { if let url = shareURL { try? FileManager.default.removeItem(at: url) } }
-    }
-
-    private func openPreview() {
-        previewText = "Report: \(reportName.isEmpty ? "Untitled" : reportName)\nFormat: \(exportFormat.rawValue)\nItems: \(selectedExpenseIds.count)"
-        showPreview = true
-    }
-
-    private func openShare() {
-        let content = "Report: \(reportName.isEmpty ? "Untitled" : reportName)\nFormat: \(exportFormat.rawValue)\nItems: \(selectedExpenseIds.count)"
-        let data = Data(content.utf8)
-        let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("report-preview.txt")
-        try? data.write(to: tmp)
-        shareURL = tmp
-        showShare = true
-    }
-}
-
-private struct OptionsListView: View {
-    let title: String
-    let options: [String]
-    @State var selected: String
-    let onPick: (String) -> Void
-
-    var body: some View {
-        List(options, id: \.self) { opt in
-            HStack {
-                Text(opt)
+                
                 Spacer()
-                if opt == selected { Image(systemName: "checkmark") }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { selected = opt; onPick(opt) }
-        }
-        .navigationTitle(title)
-    }
-}
-
-private struct MultiselectExpensesView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var selected: Set<UUID>
-
-    private let mock: [(UUID, String, String)] = (0..<20).map { (UUID(), "Merchant \($0)", "$\(String(format: "%.2f", Double($0) * 3 + 2))") }
-
-    var body: some View {
-        List {
-            ForEach(mock, id: \.0) { item in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(item.1)
-                        Text(item.2).foregroundColor(.secondary).font(.subheadline)
+                
+                // Generate Button
+                Button(action: generateReport) {
+                    HStack {
+                        if isGenerating {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+                        
+                        Text(isGenerating ? "Generating..." : "Generate Report")
+                            .font(.headline)
                     }
-                    Spacer()
-                    if selected.contains(item.0) { Image(systemName: "checkmark") }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(selectedReceipts.isEmpty ? Color.gray : Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if selected.contains(item.0) { selected.remove(item.0) } else { selected.insert(item.0) }
+                .disabled(selectedReceipts.isEmpty || isGenerating)
+                .padding(.horizontal)
+                .padding(.bottom, 20)
+            }
+            .navigationTitle("Create Report")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel", action: onCancel)
+                        .foregroundColor(.accentColor)
+                }
+            }
+            .sheet(isPresented: $showShareSheet) {
+                ReportShareSheet(items: shareItems)
+            }
+            .alert("Report Generated", isPresented: $showAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+    
+    private var allReceipts: [MockReceipt] {
+        MockReceipt.sampleData
+    }
+    
+    private func formatIcon(for format: ReportFormat) -> String {
+        switch format {
+        case .pdf: return "doc.text.fill"
+        case .csv: return "tablecells.fill"
+        case .excel: return "tablecells.fill"
+        }
+    }
+    
+    private func toggleReceipt(_ id: UUID) {
+        if selectedReceipts.contains(id) {
+            selectedReceipts.remove(id)
+        } else {
+            selectedReceipts.insert(id)
+        }
+    }
+    
+    private func generateReport() {
+        isGenerating = true
+        
+        let selectedReceiptsList = allReceipts.filter { selectedReceipts.contains($0.id) }
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            var reportURL: URL?
+            
+            switch reportFormat {
+            case .pdf:
+                reportURL = ReportGenerator.generatePDFReport(receipts: selectedReceiptsList)
+            case .csv:
+                reportURL = ReportGenerator.generateCSVReport(receipts: selectedReceiptsList)
+            case .excel:
+                reportURL = ReportGenerator.generateExcelReport(receipts: selectedReceiptsList)
+            }
+            
+            DispatchQueue.main.async {
+                isGenerating = false
+                
+                if let url = reportURL {
+                    shareItems = [url]
+                    showShareSheet = true
+                    alertMessage = "Report generated successfully! You can now share it via email or other apps."
+                } else {
+                    alertMessage = "Failed to generate report. Please try again."
+                    showAlert = true
                 }
             }
         }
-        .navigationTitle("Select Expenses")
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
     }
 }
 
-private struct ShareSheet: UIViewControllerRepresentable {
-    let activityItems: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: activityItems, applicationActivities: nil) }
-    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+struct ReceiptSelectionRow: View {
+    let receipt: MockReceipt
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onToggle) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.title2)
+            }
+            .buttonStyle(.plain)
+            
+            // Receipt thumbnail
+            AsyncImage(url: receipt.imageURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.3))
+            }
+            .frame(width: 50, height: 50)
+            .cornerRadius(8)
+            
+            // Receipt details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(receipt.merchantName)
+                    .font(.subheadline.bold())
+                    .lineLimit(1)
+                
+                Text(receipt.date, style: .date)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Text("$\(String(format: "%.2f", receipt.amount))")
+                .font(.subheadline.bold())
+                .foregroundColor(.primary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct EmptyReceiptsView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary)
+            
+            Text("No Receipts Available")
+                .font(.headline)
+            
+            Text("Add some receipts first to create a report.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
 }
 
 #Preview {
-    NavigationStack { CreateReportView() }
+    CreateReportView(onCancel: {})
 }
-
-
-

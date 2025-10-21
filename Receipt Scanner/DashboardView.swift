@@ -2,11 +2,10 @@
 //  DashboardView.swift
 //  Receipt Scanner
 //
-//  Created by AI Assistant on 10/20/25.
+//  Created by AI Assistant on 10/16/25.
 //
 
 import SwiftUI
-import UIKit
 
 struct DashboardView: View {
     let onOpenSettings: () -> Void
@@ -17,190 +16,215 @@ struct DashboardView: View {
     let onPickFromGallery: () -> Void
     let onManualExpense: () -> Void
     let onCreateReport: () -> Void
-
-    @State private var showAddMenu: Bool = false
-
+    
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
-                header
-                content
-                Spacer()
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Receipt Scanner")
+                        .font(.largeTitle.bold())
+                    Text("Track your expenses effortlessly")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                
+                // Quick Actions Grid
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 16) {
+                    // Scan Receipt
+                    QuickActionCard(
+                        title: "Scan Receipt",
+                        subtitle: "Take a photo",
+                        icon: "camera.fill",
+                        color: .blue,
+                        action: onScanReceipt
+                    )
+                    
+                    // Pick from Gallery
+                    QuickActionCard(
+                        title: "From Gallery",
+                        subtitle: "Choose existing",
+                        icon: "photo.fill",
+                        color: .green,
+                        action: onPickFromGallery
+                    )
+                    
+                    // Manual Entry
+                    QuickActionCard(
+                        title: "Manual Entry",
+                        subtitle: "Add manually",
+                        icon: "pencil.and.outline",
+                        color: .orange,
+                        action: onManualExpense
+                    )
+                    
+                    // Create Report
+                    QuickActionCard(
+                        title: "Create Report",
+                        subtitle: "Generate PDF",
+                        icon: "doc.text.fill",
+                        color: .purple,
+                        action: onCreateReport
+                    )
+                }
+                .padding(.horizontal)
+                
+                // Recent Activity Section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Recent Activity")
+                            .font(.headline)
+                        Spacer()
+                        Button("View All", action: onOpenReceipts)
+                            .font(.subheadline)
+                            .foregroundColor(.accentColor)
+                    }
+                    
+                    // Placeholder for recent receipts
+                    VStack(spacing: 8) {
+                        ForEach(0..<3) { _ in
+                            RecentReceiptRow()
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Statistics Cards
+                HStack(spacing: 12) {
+                    StatCard(
+                        title: "This Month",
+                        value: "$0.00",
+                        subtitle: "0 receipts"
+                    )
+                    
+                    StatCard(
+                        title: "Total Saved",
+                        value: "0",
+                        subtitle: "receipts"
+                    )
+                }
+                .padding(.horizontal)
+                
+                Spacer(minLength: 100)
             }
-
-            addButton
         }
-        .sheet(isPresented: $showAddMenu) {
-            AddNewItemSheet(
-                onScan: {
-                    showAddMenu = false
-                    onScanReceipt()
-                },
-                onPick: {
-                    showAddMenu = false
-                    onPickFromGallery()
-                },
-                onManual: {
-                    showAddMenu = false
-                    onManualExpense()
-                },
-                onCreateReport: {
-                    showAddMenu = false
-                    onCreateReport()
-                },
-                onCancel: { showAddMenu = false }
-            )
-            .presentationDetents([.height(360), .medium])
-            .presentationBackground(.ultraThinMaterial)
-        }
-        .background(Color(UIColor.systemGray6).ignoresSafeArea())
-    }
-
-    private var header: some View {
-        HStack {
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-                    .font(.title2)
-            }
-            Spacer()
-            Text("Receipt Scanner")
-                .font(.title2).bold()
-            Spacer()
-            Button(action: onOpenHelp) {
-                Image(systemName: "questionmark.circle")
-                    .font(.title2)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button("Settings", action: onOpenSettings)
+                    Button("Help", action: onOpenHelp)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundColor(.accentColor)
+                }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-    }
-
-    private var content: some View {
-        HStack(spacing: 16) {
-            DashboardCard(title: "Receipts", emoji: "🧾", action: onOpenReceipts)
-            DashboardCard(title: "Reports", emoji: "📊", action: onOpenReports)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 24)
-    }
-
-    private var addButton: some View {
-        Button(action: { showAddMenu = true }) {
-            Image(systemName: "plus")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 64, height: 64)
-                .background(Color.green)
-                .clipShape(Circle())
-                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
-        }
-        .padding(20)
     }
 }
 
-private struct DashboardCard: View {
+struct QuickActionCard: View {
     let title: String
-    let emoji: String
+    let subtitle: String
+    let icon: String
+    let color: Color
     let action: () -> Void
-
+    
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
-                Text(emoji)
-                    .font(.system(size: 36))
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+                
+                VStack(spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
-            .padding(24)
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-        }
-    }
-}
-
-private struct AddNewItemSheet: View {
-    let onScan: () -> Void
-    let onPick: () -> Void
-    let onManual: () -> Void
-    let onCreateReport: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.4))
-                .frame(width: 40, height: 5)
-                .padding(.top, 8)
-
-            Text("Add New Item")
-                .font(.headline)
-                .padding(.top, 4)
-
-            VStack(spacing: 10) {
-                AddRow(title: "Snap a Receipt", systemImage: "camera.viewfinder", action: onScan)
-                AddRow(title: "Choose from Gallery", systemImage: "photo.on.rectangle", action: onPick)
-                AddRow(title: "Manually Add Expense", systemImage: "square.and.pencil", action: onManual)
-                AddRow(title: "Create a report", systemImage: "doc.text", action: onCreateReport)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-
-            Button(action: onCancel) {
-                Text("Cancel")
-                    .foregroundColor(.secondary)
-                    .padding(.top, 4)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .background(VisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial)))
-    }
-}
-
-private struct AddRow: View {
-    let title: String
-    let systemImage: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: systemImage)
-                    .frame(width: 28)
-                Text(title)
-                Spacer()
-                Image(systemName: "chevron.right").foregroundColor(.secondary)
-            }
-            .padding(14)
+            .padding()
             .background(Color(UIColor.secondarySystemBackground))
             .cornerRadius(12)
         }
+        .buttonStyle(.plain)
     }
 }
 
-// UIKit blur bridge
-private struct VisualEffectView: UIViewRepresentable {
-    let effect: UIVisualEffect?
-    func makeUIView(context: Context) -> UIVisualEffectView { UIVisualEffectView(effect: effect) }
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) { uiView.effect = effect }
+struct RecentReceiptRow: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            // Receipt thumbnail placeholder
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 50, height: 50)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Sample Receipt")
+                    .font(.subheadline.bold())
+                
+                Text("Today")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Text("$0.00")
+                .font(.subheadline.bold())
+                .foregroundColor(.green)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Text(value)
+                .font(.title2.bold())
+                .foregroundColor(.primary)
+            
+            Text(subtitle)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(12)
+    }
 }
 
 #Preview {
-    DashboardView(
-        onOpenSettings: {},
-        onOpenHelp: {},
-        onOpenReceipts: {},
-        onOpenReports: {},
-                onScanReceipt: {},
-        onPickFromGallery: {},
-        onManualExpense: {},
-        onCreateReport: {}
-    )
+    NavigationStack {
+        DashboardView(
+            onOpenSettings: {},
+            onOpenHelp: {},
+            onOpenReceipts: {},
+            onOpenReports: {},
+            onScanReceipt: {},
+            onPickFromGallery: {},
+            onManualExpense: {},
+            onCreateReport: {}
+        )
+    }
 }
-
-
-

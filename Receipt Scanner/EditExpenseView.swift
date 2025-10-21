@@ -67,7 +67,7 @@ struct EditExpenseView: View {
                                 .scaledToFit()
                                 .frame(height: 200)
                                 .frame(maxWidth: .infinity, alignment: .center)
-                                .cornerRadius(10)
+                                .cornerRadius(12)
 
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
                                 .foregroundColor(.secondary)
@@ -115,7 +115,7 @@ struct EditExpenseView: View {
                                 HStack(spacing: 6) {
                                     Text(selectedCurrency.flag)
                                     Text(selectedCurrency.code)
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.accentColor)
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 10)
@@ -209,7 +209,7 @@ struct EditExpenseView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.green)
+                            .background(Color.accentColor)
                             .foregroundColor(.white)
                             .cornerRadius(12)
                     }
@@ -227,6 +227,7 @@ struct EditExpenseView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("Back", action: onScanAnother)
+                    .foregroundColor(.accentColor)
             }
         }
         .onAppear(perform: prefillFromOCR)
@@ -266,7 +267,7 @@ struct EditExpenseView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") { showReceiptViewer = false }
-                            .foregroundColor(.white)
+                            .foregroundColor(.accentColor)
                     }
                 }
             }
@@ -357,9 +358,11 @@ private struct CurrencyPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Back") { isPresented = false }
+                        .foregroundColor(.accentColor)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { isPresented = false }
+                        .foregroundColor(.accentColor)
                 }
             }
         }
@@ -416,7 +419,9 @@ private struct CategoryPickerView: View {
                     Button(action: { draftCategory = Category(name: "", emoji: ""); showCreate = true }) {
                         HStack {
                             Image(systemName: "plus.circle")
+                                .foregroundColor(.accentColor)
                             Text("Create new category")
+                                .foregroundColor(.accentColor)
                         }
                     }
                 }
@@ -425,9 +430,11 @@ private struct CategoryPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Back") { isPresented = false }
+                        .foregroundColor(.accentColor)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { isPresented = false }
+                        .foregroundColor(.accentColor)
                 }
             }
             .sheet(isPresented: $showCreate) {
@@ -444,6 +451,7 @@ private struct CategoryPickerView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("Back") { showCreate = false }
+                                .foregroundColor(.accentColor)
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Save") {
@@ -453,6 +461,7 @@ private struct CategoryPickerView: View {
                                 isPresented = false
                             }
                             .disabled(draftCategory.name.trimmingCharacters(in: .whitespaces).isEmpty && draftCategory.emoji.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .foregroundColor(.accentColor)
                         }
                     }
                 }
@@ -496,9 +505,11 @@ private struct PaymentPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Back") { isPresented = false }
+                        .foregroundColor(.accentColor)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { isPresented = false }
+                        .foregroundColor(.accentColor)
                 }
             }
         }
@@ -507,12 +518,14 @@ private struct PaymentPickerView: View {
 }
 
 #Preview {
-    EditExpenseView(
-        imageURL: URL(fileURLWithPath: "/dev/null"),
-        recognizedText: "Sample Receipt\nStore: Demo Market\nDate: 2025-10-16\nTotal: $11.64",
-        onScanAnother: {},
-        onSaved: {}
-    )
+    NavigationStack {
+        EditExpenseView(
+            imageURL: URL(fileURLWithPath: "/dev/null"),
+            recognizedText: "Sample Receipt\nStore: Demo Market\nDate: 2025-10-16\nTotal: $11.64",
+            onScanAnother: {},
+            onSaved: {}
+        )
+    }
 }
 
 

@@ -21,25 +21,17 @@ enum ScannerResult {
 }
 
 struct ScannerContainer: UIViewControllerRepresentable {
-    typealias UIViewControllerType = UINavigationController
+    typealias UIViewControllerType = VNDocumentCameraViewController
 
     let onComplete: (ScannerResult) -> Void
 
-    func makeUIViewController(context: Context) -> UINavigationController {
-        let cameraController = VNDocumentCameraViewController()
-        cameraController.delegate = context.coordinator
-        cameraController.navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "Use Sample",
-            style: .plain,
-            target: context.coordinator,
-            action: #selector(Coordinator.useSampleTapped)
-        )
-        let nav = UINavigationController(rootViewController: cameraController)
-        nav.navigationBar.prefersLargeTitles = false
-        return nav
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let controller = VNDocumentCameraViewController()
+        controller.delegate = context.coordinator
+        return controller
     }
 
-    func updateUIViewController(_ uiViewController: UINavigationController, context: Context) {}
+    func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onComplete: onComplete)
@@ -50,20 +42,6 @@ struct ScannerContainer: UIViewControllerRepresentable {
 
         init(onComplete: @escaping (ScannerResult) -> Void) {
             self.onComplete = onComplete
-        }
-
-        @objc func useSampleTapped() {
-            guard let image = SampleReceiptGenerator.generate() else {
-                onComplete(.failure(NSError(domain: "Scanner", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to generate sample"])) )
-                return
-            }
-            guard let url = FileStorage.save(image: image) else {
-                onComplete(.failure(NSError(domain: "Scanner", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to save sample image"])) )
-                return
-            }
-            OCRTextRecognizer.recognizeText(from: image) { [onComplete] text in
-                onComplete(.success(ScannerOutput(imageURL: url, recognizedText: text ?? "")))
-            }
         }
 
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {

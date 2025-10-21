@@ -42,6 +42,7 @@ struct OnboardingFlowView: View {
                     if step > 1 {
                         Button(action: { step = max(1, step - 1) }) {
                             Text("Back")
+                                .foregroundColor(.accentColor)
                         }
                         .padding(.leading, 16)
                         .padding(.top, 8)
@@ -146,7 +147,7 @@ struct OnboardingFlowView: View {
             onFinish(.useSample)
             onRequestSample()
         }) {
-            Text("Skip, I don’t have a receipt right now")
+            Text("Skip, I don’t have a receipt righ now")
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
                 .padding()
