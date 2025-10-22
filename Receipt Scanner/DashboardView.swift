@@ -17,6 +17,11 @@ struct DashboardView: View {
     let onManualExpense: () -> Void
     let onCreateReport: () -> Void
     
+    @StateObject private var storageManager = StorageManager.shared
+    @State private var recentActivities: [RecentActivityItem] = []
+    @State private var monthlyStats: (totalAmount: Double, receiptCount: Int) = (0, 0)
+    @State private var totalReceiptCount: Int = 0
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -85,10 +90,23 @@ struct DashboardView: View {
                             .foregroundColor(.accentColor)
                     }
                     
-                    // Placeholder for recent receipts
+                    // Real recent activities
                     VStack(spacing: 8) {
-                        ForEach(0..<3) { _ in
-                            RecentReceiptRow()
+                        if recentActivities.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                                Text("No recent activity")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else {
+                            ForEach(recentActivities) { activity in
+                                RecentActivityRow(activity: activity)
+                            }
                         }
                     }
                 }
@@ -98,13 +116,13 @@ struct DashboardView: View {
                 HStack(spacing: 12) {
                     StatCard(
                         title: "This Month",
-                        value: "$0.00",
-                        subtitle: "0 receipts"
+                        value: String(format: "$%.2f", monthlyStats.totalAmount),
+                        subtitle: "\(monthlyStats.receiptCount) receipts"
                     )
                     
                     StatCard(
                         title: "Total Saved",
-                        value: "0",
+                        value: "\(totalReceiptCount)",
                         subtitle: "receipts"
                     )
                 }
@@ -125,6 +143,21 @@ struct DashboardView: View {
                 }
             }
         }
+        .onAppear {
+            loadDashboardData()
+        }
+        .onReceive(storageManager.$receipts) { _ in
+            loadDashboardData()
+        }
+        .onReceive(storageManager.$reports) { _ in
+            loadDashboardData()
+        }
+    }
+    
+    private func loadDashboardData() {
+        recentActivities = storageManager.fetchRecentActivities(limit: 5)
+        monthlyStats = storageManager.getMonthlyStatistics()
+        totalReceiptCount = storageManager.getTotalReceiptCount()
     }
 }
 
@@ -161,28 +194,63 @@ struct QuickActionCard: View {
     }
 }
 
-struct RecentReceiptRow: View {
+struct RecentActivityRow: View {
+    let activity: RecentActivityItem
+    
     var body: some View {
         HStack(spacing: 12) {
-            // Receipt thumbnail placeholder
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.3))
+            // Activity thumbnail
+            if let thumbnailURL = activity.thumbnailURL {
+                AsyncImage(url: thumbnailURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                }
                 .frame(width: 50, height: 50)
+                .cornerRadius(8)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Image(systemName: activity.type == .receipt ? 
+                              (activity.isManualEntry ? "pencil" : "doc.text") : 
+                              "doc.text.fill")
+                            .foregroundColor(.gray)
+                    )
+            }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Sample Receipt")
+                Text(activity.title)
                     .font(.subheadline.bold())
+                    .lineLimit(1)
                 
-                Text("Today")
+                Text(activity.subtitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
             
             Spacer()
             
-            Text("$0.00")
-                .font(.subheadline.bold())
-                .foregroundColor(.green)
+            VStack(alignment: .trailing, spacing: 4) {
+                if let amount = activity.amount, let currency = activity.currency {
+                    Text("\(currency) \(String(format: "%.2f", amount))")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.green)
+                } else {
+                    Text(activity.date, style: .date)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Text(activity.date, style: .date)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding(.vertical, 8)
     }

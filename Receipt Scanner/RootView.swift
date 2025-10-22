@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct RootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
@@ -13,6 +14,8 @@ struct RootView: View {
     @State private var scannedImageURL: URL? = nil
     @State private var recognizedText: String = ""
     @State private var navigateToDashboardAfterSave: Bool = false
+    @State private var cameraPermissionStatus: AVAuthorizationStatus = .notDetermined
+    @State private var showPermissionAlert: Bool = false
     
     // New navigation states
     @State private var showImagePicker: Bool = false
@@ -28,12 +31,12 @@ struct RootView: View {
                         hasCompletedOnboarding = true
                         switch action {
                         case .scanNow:
-                            showScanner = true
+                            requestCameraPermissionAndScan()
                         case .useSample:
                             generateSample()
                         }
                     },
-                    onRequestScan: { showScanner = true },
+                    onRequestScan: { requestCameraPermissionAndScan() },
                     onRequestSample: { generateSample() }
                 )
             } else if let url = scannedImageURL {
@@ -44,7 +47,7 @@ struct RootView: View {
                         onScanAnother: {
                             // Reset to scan another receipt
                             scannedImageURL = nil
-                            showScanner = true
+                            requestCameraPermissionAndScan()
                         },
                         onSaved: {
                             // After save, go to dashboard
@@ -62,7 +65,7 @@ struct RootView: View {
                         onOpenHelp: {},
                         onOpenReceipts: { showReceiptsList = true },
                         onOpenReports: {},
-                        onScanReceipt: { showScanner = true },
+                        onScanReceipt: { requestCameraPermissionAndScan() },
                         onPickFromGallery: { showImagePicker = true },
                         onManualExpense: { showManualExpense = true },
                         onCreateReport: { showCreateReport = true }
@@ -75,9 +78,16 @@ struct RootView: View {
                 showScanner = false
                 switch result {
                 case .success(let output):
-                    self.scannedImageURL = output.imageURL
-                    self.recognizedText = output.recognizedText
-                case .failure:
+                    print("Scanner completed successfully - Image URL: \(output.imageURL)")
+                    print("Scanner completed successfully - OCR Text: \(output.recognizedText)")
+                    // Use async to ensure sheet dismissal completes before updating state
+                    DispatchQueue.main.async {
+                        self.scannedImageURL = output.imageURL
+                        self.recognizedText = output.recognizedText
+                    }
+                case .failure(let error):
+                    print("Scanner error: \(error.localizedDescription)")
+                    // Handle error appropriately
                     break
                 }
             }
@@ -120,11 +130,50 @@ struct RootView: View {
                 ReceiptsListView()
             }
         }
-        .onChange(of: navigateToDashboardAfterSave) { _, toDashboard in
+        .alert("Camera Permission Required", isPresented: $showPermissionAlert) {
+            Button("Settings") {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please enable camera access in Settings to scan receipts.")
+        }
+        .onChange(of: navigateToDashboardAfterSave) { toDashboard in
             if toDashboard {
                 // Ensure we're not on edit anymore; reset flag
                 navigateToDashboardAfterSave = false
             }
+        }
+        .onAppear {
+            checkCameraPermission()
+        }
+    }
+
+    private func checkCameraPermission() {
+        cameraPermissionStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    }
+    
+    private func requestCameraPermissionAndScan() {
+        switch cameraPermissionStatus {
+        case .authorized:
+            showScanner = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    cameraPermissionStatus = granted ? .authorized : .denied
+                    if granted {
+                        showScanner = true
+                    } else {
+                        showPermissionAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showPermissionAlert = true
+        @unknown default:
+            showPermissionAlert = true
         }
     }
 

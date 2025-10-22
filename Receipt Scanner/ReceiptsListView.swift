@@ -6,26 +6,15 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct ReceiptsListView: View {
+    @StateObject private var storageManager = StorageManager.shared
+    @Environment(\.managedObjectContext) private var viewContext
     @State private var searchText = ""
-    @State private var selectedFilter: FilterOption = .all
-    @State private var sortOption: SortOption = .dateDesc
+    @State private var selectedFilter: ReceiptFilter = .all
+    @State private var sortOption: ReceiptSortOption = .dateDesc
     
-    enum FilterOption: String, CaseIterable {
-        case all = "All"
-        case thisMonth = "This Month"
-        case lastMonth = "Last Month"
-        case taxDeductible = "Tax Deductible"
-    }
-    
-    enum SortOption: String, CaseIterable {
-        case dateDesc = "Date (Newest)"
-        case dateAsc = "Date (Oldest)"
-        case amountDesc = "Amount (Highest)"
-        case amountAsc = "Amount (Lowest)"
-        case merchant = "Merchant (A-Z)"
-    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,7 +27,7 @@ struct ReceiptsListView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     // Filter Options
-                    ForEach(FilterOption.allCases, id: \.self) { filter in
+                    ForEach(ReceiptFilter.allCases, id: \.self) { filter in
                         FilterChip(
                             title: filter.rawValue,
                             isSelected: selectedFilter == filter,
@@ -50,7 +39,7 @@ struct ReceiptsListView: View {
                     
                     // Sort Menu
                     Menu {
-                        ForEach(SortOption.allCases, id: \.self) { sort in
+                        ForEach(ReceiptSortOption.allCases, id: \.self) { sort in
                             Button(sort.rawValue) {
                                 sortOption = sort
                             }
@@ -87,50 +76,28 @@ struct ReceiptsListView: View {
         }
         .navigationTitle("Receipts")
         .navigationBarTitleDisplayMode(.large)
+        .onAppear {
+            // Refresh data when view appears
+            storageManager.refreshReceipts()
+        }
     }
     
-    // Mock data for now - replace with actual Core Data fetch
-    private var filteredReceipts: [MockReceipt] {
-        var receipts = MockReceipt.sampleData
-        
-        // Apply search filter
-        if !searchText.isEmpty {
-            receipts = receipts.filter { receipt in
-                receipt.merchantName.localizedCaseInsensitiveContains(searchText) ||
-                receipt.category.localizedCaseInsensitiveContains(searchText) ||
-                receipt.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
-            }
-        }
-        
-        // Apply category filter
-        switch selectedFilter {
-        case .all:
-            break
-        case .thisMonth:
-            receipts = receipts.filter { receipt in
-                Calendar.current.isDate(receipt.date, equalTo: Date(), toGranularity: .month)
-            }
-        case .lastMonth:
-            let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
-            receipts = receipts.filter { receipt in
-                Calendar.current.isDate(receipt.date, equalTo: lastMonth, toGranularity: .month)
-            }
-        case .taxDeductible:
-            receipts = receipts.filter { $0.isTaxDeductible }
-        }
+    // Real Core Data fetch with filtering and sorting
+    private var filteredReceipts: [Receipt] {
+        var receipts = storageManager.fetchReceipts(filter: selectedFilter, searchText: searchText)
         
         // Apply sorting
         switch sortOption {
         case .dateDesc:
-            receipts.sort { $0.date > $1.date }
+            receipts.sort { ($0.date ?? Date.distantPast) > ($1.date ?? Date.distantPast) }
         case .dateAsc:
-            receipts.sort { $0.date < $1.date }
+            receipts.sort { ($0.date ?? Date.distantPast) < ($1.date ?? Date.distantPast) }
         case .amountDesc:
             receipts.sort { $0.amount > $1.amount }
         case .amountAsc:
             receipts.sort { $0.amount < $1.amount }
         case .merchant:
-            receipts.sort { $0.merchantName < $1.merchantName }
+            receipts.sort { ($0.merchantName ?? "") < ($1.merchantName ?? "") }
         }
         
         return receipts
@@ -182,30 +149,51 @@ struct FilterChip: View {
 }
 
 struct ReceiptRowView: View {
-    let receipt: MockReceipt
+    let receipt: Receipt
     
     var body: some View {
         HStack(spacing: 12) {
             // Receipt thumbnail
-            AsyncImage(url: receipt.imageURL) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
+            if let thumbnailURL = receipt.thumbnailURL {
+                AsyncImage(url: thumbnailURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                }
+                .frame(width: 60, height: 60)
+                .cornerRadius(8)
+            } else if let imageURL = receipt.imageURL {
+                AsyncImage(url: imageURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                }
+                .frame(width: 60, height: 60)
+                .cornerRadius(8)
+            } else {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.gray.opacity(0.3))
+                    .frame(width: 60, height: 60)
+                    .overlay(
+                        Image(systemName: receipt.isManualEntry ? "pencil" : "doc.text")
+                            .foregroundColor(.gray)
+                    )
             }
-            .frame(width: 60, height: 60)
-            .cornerRadius(8)
             
             // Receipt details
             VStack(alignment: .leading, spacing: 4) {
-                Text(receipt.merchantName)
+                Text(receipt.merchantName ?? "Unknown Merchant")
                     .font(.headline)
                     .lineLimit(1)
                 
                 HStack {
-                    Text(receipt.category)
+                    Text(receipt.category ?? "Other")
                         .font(.caption)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -220,9 +208,18 @@ struct ReceiptRowView: View {
                             .background(Color.green.opacity(0.2))
                             .cornerRadius(4)
                     }
+                    
+                    if receipt.isManualEntry {
+                        Text("Manual")
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.2))
+                            .cornerRadius(4)
+                    }
                 }
                 
-                Text(receipt.date, style: .date)
+                Text(receipt.date ?? Date(), style: .date)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -231,11 +228,11 @@ struct ReceiptRowView: View {
             
             // Amount
             VStack(alignment: .trailing, spacing: 4) {
-                Text("$\(String(format: "%.2f", receipt.amount))")
+                Text("\(receipt.currency ?? "USD") \(String(format: "%.2f", receipt.amount))")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
-                Text(receipt.paymentMethod)
+                Text(receipt.paymentMethod ?? "Other")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -265,51 +262,6 @@ struct EmptyStateView: View {
     }
 }
 
-// Mock data structure - replace with Core Data model
-struct MockReceipt: Identifiable {
-    let id = UUID()
-    let merchantName: String
-    let amount: Double
-    let date: Date
-    let category: String
-    let paymentMethod: String
-    let isTaxDeductible: Bool
-    let tags: [String]
-    let imageURL: URL?
-    
-    static let sampleData: [MockReceipt] = [
-        MockReceipt(
-            merchantName: "Coffee Shop",
-            amount: 4.50,
-            date: Date(),
-            category: "Food & Dining",
-            paymentMethod: "Credit Card",
-            isTaxDeductible: false,
-            tags: ["coffee", "morning"],
-            imageURL: nil
-        ),
-        MockReceipt(
-            merchantName: "Office Supplies Store",
-            amount: 25.99,
-            date: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date(),
-            category: "Office supplies",
-            paymentMethod: "Debit Card",
-            isTaxDeductible: true,
-            tags: ["office", "supplies"],
-            imageURL: nil
-        ),
-        MockReceipt(
-            merchantName: "Gas Station",
-            amount: 45.20,
-            date: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date(),
-            category: "Travel expenses",
-            paymentMethod: "Credit Card",
-            isTaxDeductible: true,
-            tags: ["gas", "travel"],
-            imageURL: nil
-        )
-    ]
-}
 
 #Preview {
     NavigationStack {

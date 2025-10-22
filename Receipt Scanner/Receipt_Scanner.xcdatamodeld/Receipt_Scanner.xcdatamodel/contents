@@ -1,9 +1,36 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
-    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
-        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    <entity name="Receipt" representedClassName="Receipt" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="merchantName" optional="YES" attributeType="String"/>
+        <attribute name="amount" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="currency" optional="YES" attributeType="String" defaultValueString="USD"/>
+        <attribute name="date" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="category" optional="YES" attributeType="String" defaultValueString="Other"/>
+        <attribute name="categoryEmoji" optional="YES" attributeType="String" defaultValueString="🗂️"/>
+        <attribute name="paymentMethod" optional="YES" attributeType="String" defaultValueString="Other"/>
+        <attribute name="paymentEmoji" optional="YES" attributeType="String" defaultValueString="❓"/>
+        <attribute name="isTaxDeductible" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="tags" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="imageURL" optional="YES" attributeType="URI"/>
+        <attribute name="thumbnailURL" optional="YES" attributeType="URI"/>
+        <attribute name="recognizedText" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isManualEntry" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="Report" representedClassName="Report" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="title" optional="NO" attributeType="String"/>
+        <attribute name="type" optional="NO" attributeType="String"/>
+        <attribute name="fileURL" optional="NO" attributeType="URI"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="receiptCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
     </entity>
     <elements>
-        <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
+        <element name="Receipt" positionX="-63" positionY="-18" width="128" height="374"/>
+        <element name="Report" positionX="-63" positionY="144" width="128" height="194"/>
     </elements>
 </model>

@@ -87,7 +87,7 @@ struct CreateReportView: View {
                             if selectedReceipts.count == allReceipts.count {
                                 selectedReceipts.removeAll()
                             } else {
-                                selectedReceipts = Set(allReceipts.map { $0.id })
+                                selectedReceipts = Set(allReceipts.compactMap { $0.id })
                             }
                         }
                         .font(.subheadline)
@@ -101,8 +101,12 @@ struct CreateReportView: View {
                         List(allReceipts) { receipt in
                             ReceiptSelectionRow(
                                 receipt: receipt,
-                                isSelected: selectedReceipts.contains(receipt.id),
-                                onToggle: { toggleReceipt(receipt.id) }
+                                isSelected: selectedReceipts.contains(receipt.id ?? UUID()),
+                                onToggle: { 
+                                    if let id = receipt.id {
+                                        toggleReceipt(id)
+                                    }
+                                }
                             )
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
@@ -154,8 +158,8 @@ struct CreateReportView: View {
         }
     }
     
-    private var allReceipts: [MockReceipt] {
-        MockReceipt.sampleData
+    private var allReceipts: [Receipt] {
+        StorageManager.shared.fetchReceipts()
     }
     
     private func formatIcon(for format: ReportFormat) -> String {
@@ -177,7 +181,10 @@ struct CreateReportView: View {
     private func generateReport() {
         isGenerating = true
         
-        let selectedReceiptsList = allReceipts.filter { selectedReceipts.contains($0.id) }
+        let selectedReceiptsList = allReceipts.filter { receipt in
+            guard let id = receipt.id else { return false }
+            return selectedReceipts.contains(id)
+        }
         
         DispatchQueue.global(qos: .userInitiated).async {
             var reportURL: URL?
@@ -208,7 +215,7 @@ struct CreateReportView: View {
 }
 
 struct ReceiptSelectionRow: View {
-    let receipt: MockReceipt
+    let receipt: Receipt
     let isSelected: Bool
     let onToggle: () -> Void
     
@@ -222,31 +229,52 @@ struct ReceiptSelectionRow: View {
             .buttonStyle(.plain)
             
             // Receipt thumbnail
-            AsyncImage(url: receipt.imageURL) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
+            if let thumbnailURL = receipt.thumbnailURL {
+                AsyncImage(url: thumbnailURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                }
+                .frame(width: 50, height: 50)
+                .cornerRadius(8)
+            } else if let imageURL = receipt.imageURL {
+                AsyncImage(url: imageURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                }
+                .frame(width: 50, height: 50)
+                .cornerRadius(8)
+            } else {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.gray.opacity(0.3))
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Image(systemName: receipt.isManualEntry ? "pencil" : "doc.text")
+                            .foregroundColor(.gray)
+                    )
             }
-            .frame(width: 50, height: 50)
-            .cornerRadius(8)
             
             // Receipt details
             VStack(alignment: .leading, spacing: 4) {
-                Text(receipt.merchantName)
+                Text(receipt.merchantName ?? "Unknown Merchant")
                     .font(.subheadline.bold())
                     .lineLimit(1)
                 
-                Text(receipt.date, style: .date)
+                Text(receipt.date ?? Date(), style: .date)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
             Spacer()
             
-            Text("$\(String(format: "%.2f", receipt.amount))")
+            Text("\(receipt.currency ?? "USD") \(String(format: "%.2f", receipt.amount))")
                 .font(.subheadline.bold())
                 .foregroundColor(.primary)
         }

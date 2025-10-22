@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import CoreData
 
 // MARK: - Models
 
@@ -36,6 +37,7 @@ struct EditExpenseView: View {
     let onScanAnother: () -> Void
     let onSaved: () -> Void
     @State private var showReceiptViewer: Bool = false
+    @Environment(\.managedObjectContext) private var viewContext
 
     // Editable fields
     @State private var merchantName: String = ""
@@ -53,6 +55,8 @@ struct EditExpenseView: View {
     @State private var showCategorySheet: Bool = false
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
+    @State private var showErrorAlert: Bool = false
+    @State private var errorMessage: String = ""
 
     var body: some View {
             ScrollView {
@@ -243,6 +247,11 @@ struct EditExpenseView: View {
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }
         }
+        .alert("Save Error", isPresented: $showErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
         .fullScreenCover(isPresented: $showReceiptViewer) {
             let fullImage = UIImage(contentsOfFile: imageURL.path) ?? SampleReceiptGenerator.generate()
             NavigationStack {
@@ -275,9 +284,65 @@ struct EditExpenseView: View {
     }
 
     private func saveExpense() {
-        // Placeholder for persistence integration.
-        showSavedAlert = false
-        onSaved()
+        // Parse amount
+        let amount = Double(totalAmountText) ?? 0.0
+        
+        // Parse tags
+        let tags = tagsText.components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        
+        // Use the existing image URL from scanning - no need to save again
+        // The image was already saved during the scanning process in ScannerContainer
+        let finalImageURL = imageURL
+        
+        // Create thumbnail if needed (for better performance in lists)
+        let thumbnailURL: URL?
+        if let image = UIImage(contentsOfFile: imageURL.path) {
+            let thumbnailResult = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.3)
+            thumbnailURL = thumbnailResult.thumbnailURL
+        } else {
+            thumbnailURL = nil
+        }
+        
+        // Create receipt directly in Core Data
+        let receipt = Receipt(context: viewContext)
+        receipt.id = UUID()
+        receipt.merchantName = merchantName.isEmpty ? "Unknown Merchant" : merchantName
+        receipt.amount = amount
+        receipt.currency = selectedCurrency.code.isEmpty ? "USD" : selectedCurrency.code
+        receipt.date = date
+        receipt.category = selectedCategory.name.isEmpty ? "Other" : selectedCategory.name
+        receipt.categoryEmoji = selectedCategory.emoji.isEmpty ? "🗂️" : selectedCategory.emoji
+        receipt.paymentMethod = selectedPayment.name.isEmpty ? "Other" : selectedPayment.name
+        receipt.paymentEmoji = selectedPayment.emoji.isEmpty ? "❓" : selectedPayment.emoji
+        receipt.isTaxDeductible = taxDeductible
+        receipt.tags = tags.joined(separator: ",")
+        receipt.notes = notes
+        receipt.imageURL = finalImageURL
+        receipt.thumbnailURL = thumbnailURL
+        receipt.recognizedText = recognizedText
+        receipt.isManualEntry = false
+        receipt.createdAt = Date()
+        receipt.updatedAt = Date()
+        
+        // Save to Core Data
+        do {
+            try viewContext.save()
+            print("Successfully saved receipt: \(receipt.merchantName ?? "Unknown") - $\(receipt.amount)")
+            showSavedAlert = true
+            // Delay the onSaved callback to show the alert first
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                onSaved()
+            }
+        } catch {
+            // Handle save error - show user-friendly error
+            errorMessage = "Failed to save receipt. Please check your device storage and try again."
+            showErrorAlert = true
+            print("Failed to save receipt to Core Data: \(error)")
+            // Rollback the context to prevent corruption
+            viewContext.rollback()
+        }
     }
 
     // Very lightweight heuristics based on recognizedText

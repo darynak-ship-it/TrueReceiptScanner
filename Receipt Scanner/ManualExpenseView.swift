@@ -318,7 +318,7 @@ struct ManualExpenseView: View {
                 }
             }
         }
-        .onChange(of: attachedImage) { _, newImage in
+        .onChange(of: attachedImage) { newImage in
             if let image = newImage {
                 // Save the image and perform OCR
                 if let url = FileStorage.save(image: image) {
@@ -335,10 +335,48 @@ struct ManualExpenseView: View {
     }
     
     private func saveExpense() {
-        // Save the expense with optional image
-        // For now, just show success and call onSaved
-        showSavedAlert = true
-        onSaved()
+        // Parse amount
+        let amount = Double(totalAmountText) ?? 0.0
+        
+        // Parse tags
+        let tags = tagsText.components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        
+        // Save image and get URLs if image is attached
+        let imageURLs: (imageURL: URL?, thumbnailURL: URL?)
+        if let image = attachedImage {
+            imageURLs = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.6)
+        } else {
+            imageURLs = (nil, nil)
+        }
+        
+        // Save receipt to Core Data
+        let savedReceipt = StorageManager.shared.saveReceipt(
+            merchantName: merchantName,
+            amount: amount,
+            currency: selectedCurrency.code,
+            date: date,
+            category: selectedCategory.name,
+            categoryEmoji: selectedCategory.emoji,
+            paymentMethod: selectedPayment.name,
+            paymentEmoji: selectedPayment.emoji,
+            isTaxDeductible: taxDeductible,
+            tags: tags,
+            notes: notes,
+            imageURL: imageURLs.imageURL,
+            thumbnailURL: imageURLs.thumbnailURL,
+            recognizedText: nil,
+            isManualEntry: true
+        )
+        
+        if savedReceipt != nil {
+            showSavedAlert = true
+            onSaved()
+        } else {
+            // Handle save error
+            print("Failed to save manual expense")
+        }
     }
     
     private func prefillFromOCR(_ recognizedText: String) {
