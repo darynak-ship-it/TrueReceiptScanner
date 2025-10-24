@@ -34,6 +34,10 @@ struct ManualExpenseView: View {
     let onSaved: () -> Void
     let onCancel: () -> Void
     
+    @AppStorage("defaultCurrency") private var defaultCurrency: String = "USD"
+    @AppStorage("defaultCategory") private var defaultCategory: String = "Other"
+    @StateObject private var themeManager = ThemeManager.shared
+    
     // Editable fields
     @State private var merchantName: String = ""
     @State private var date: Date = Date()
@@ -56,6 +60,45 @@ struct ManualExpenseView: View {
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
     @State private var showImagePicker: Bool = false
+    
+    // Currency and category options
+    private let currencies: [Currency] = [
+        Currency(code: "CAD", flag: "🇨🇦"),
+        Currency(code: "CHF", flag: "🇨🇭"),
+        Currency(code: "CZK", flag: "🇨🇿"),
+        Currency(code: "DKK", flag: "🇩🇰"),
+        Currency(code: "EUR", flag: "🇪🇺"),
+        Currency(code: "GBP", flag: "🇬🇧"),
+        Currency(code: "HUF", flag: "🇭🇺"),
+        Currency(code: "INR", flag: "🇮🇳"),
+        Currency(code: "JPY", flag: "🇯🇵"),
+        Currency(code: "KRW", flag: "🇰🇷"),
+        Currency(code: "MXN", flag: "🇲🇽"),
+        Currency(code: "NOK", flag: "🇳🇴"),
+        Currency(code: "PLN", flag: "🇵🇱"),
+        Currency(code: "RON", flag: "🇷🇴"),
+        Currency(code: "SEK", flag: "🇸🇪"),
+        Currency(code: "USD", flag: "🇺🇸")
+    ]
+    
+    private let categories: [Category] = [
+        Category(name: "Travel expenses", emoji: "🧳"),
+        Category(name: "Food & Dining", emoji: "🍽️"),
+        Category(name: "Accommodation", emoji: "🏨"),
+        Category(name: "Office supplies", emoji: "📎"),
+        Category(name: "Technology and equipment", emoji: "🖥️"),
+        Category(name: "Software and subscriptions", emoji: "🛠️"),
+        Category(name: "Education", emoji: "📚"),
+        Category(name: "Professional memberships", emoji: "🪪"),
+        Category(name: "Home office expenses", emoji: "🏡"),
+        Category(name: "Uniform", emoji: "🥋"),
+        Category(name: "Sports", emoji: "💪"),
+        Category(name: "Health", emoji: "❤️‍🩹"),
+        Category(name: "Communication expenses", emoji: "☎️"),
+        Category(name: "Relocation expenses", emoji: "📦"),
+        Category(name: "Client-related expenses", emoji: "🤝"),
+        Category(name: "Other", emoji: "🗂️")
+    ]
     
     var body: some View {
         ScrollView {
@@ -135,7 +178,7 @@ struct ManualExpenseView: View {
                             .font(.headline)
                         TextField("Enter merchant name", text: $merchantName)
                             .padding(12)
-                            .background(Color.white)
+                            .background(themeManager.textFieldBackgroundColor)
                             .cornerRadius(8)
                     }
                     
@@ -157,7 +200,7 @@ struct ManualExpenseView: View {
                             TextField("0.00", text: $totalAmountText)
                                 .keyboardType(.decimalPad)
                                 .padding(12)
-                                .background(Color.white)
+                                .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
                             Button(action: { showCurrencySheet = true }) {
                                 HStack(spacing: 6) {
@@ -223,10 +266,10 @@ struct ManualExpenseView: View {
                             }
                             TextField("", text: $tagsText)
                                 .padding(12)
-                                .background(Color.white.opacity(0.001))
+                                .background(themeManager.textFieldBackgroundColor)
                         }
                         .padding(12)
-                        .background(Color.white)
+                        .background(themeManager.secondaryBackgroundColor)
                         .cornerRadius(8)
                     }
                     
@@ -244,10 +287,10 @@ struct ManualExpenseView: View {
                             TextEditor(text: $notes)
                                 .frame(minHeight: 120)
                                 .padding(8)
-                                .background(Color.clear)
+                                .background(themeManager.textFieldBackgroundColor)
                         }
                         .padding(12)
-                        .background(Color.white)
+                        .background(themeManager.secondaryBackgroundColor)
                         .cornerRadius(8)
                     }
                     
@@ -282,13 +325,13 @@ struct ManualExpenseView: View {
             ImagePicker(selectedImage: $attachedImage)
         }
         .sheet(isPresented: $showCurrencySheet) {
-            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet)
+            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
         }
         .sheet(isPresented: $showCategorySheet) {
-            CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet)
+            CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet, themeManager: themeManager)
         }
         .sheet(isPresented: $showPaymentSheet) {
-            PaymentPickerView(selected: $selectedPayment, isPresented: $showPaymentSheet)
+            PaymentPickerView(selected: $selectedPayment, isPresented: $showPaymentSheet, themeManager: themeManager)
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }
@@ -316,6 +359,15 @@ struct ManualExpenseView: View {
                         }
                     }
                 }
+            }
+        }
+        .onAppear {
+            // Set default currency and category from settings
+            if let defaultCurrencyObj = currencies.first(where: { $0.code == defaultCurrency }) {
+                selectedCurrency = defaultCurrencyObj
+            }
+            if let defaultCategoryObj = categories.first(where: { $0.name == defaultCategory }) {
+                selectedCategory = defaultCategoryObj
             }
         }
         .onChange(of: attachedImage) { newImage in
@@ -424,6 +476,7 @@ struct ManualExpenseView: View {
 private struct CurrencyPickerView: View {
     @Binding var selected: Currency
     @Binding var isPresented: Bool
+    @ObservedObject var themeManager: ThemeManager
 
     private let currencies: [Currency] = [
         Currency(code: "CAD", flag: "🇨🇦"),
@@ -455,6 +508,7 @@ private struct CurrencyPickerView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { selected = curr }
+                .listRowBackground(curr == selected ? themeManager.selectionColor : Color.clear)
             }
             .navigationTitle("Currency")
             .toolbar {
@@ -479,6 +533,7 @@ private struct CategoryPickerView: View {
     @Binding var isPresented: Bool
     @State private var showCreate: Bool = false
     @State private var draftCategory: Category = Category(name: "", emoji: "")
+    @ObservedObject var themeManager: ThemeManager
 
     private var presets: [Category] {
         [
@@ -514,6 +569,7 @@ private struct CategoryPickerView: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture { selected = cat }
+                        .listRowBackground(cat == selected ? themeManager.selectionColor : Color.clear)
                     }
                 }
 
@@ -579,6 +635,7 @@ private struct CategoryPickerView: View {
 private struct PaymentPickerView: View {
     @Binding var selected: PaymentMethod
     @Binding var isPresented: Bool
+    @ObservedObject var themeManager: ThemeManager
 
     private let methods: [PaymentMethod] = [
         PaymentMethod(name: "Credit Card", emoji: "💳"),
@@ -602,6 +659,7 @@ private struct PaymentPickerView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { selected = method }
+                .listRowBackground(method == selected ? themeManager.selectionColor : Color.clear)
             }
             .navigationTitle("Payment Method")
             .toolbar {

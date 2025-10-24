@@ -67,10 +67,12 @@ struct ScannerContainer: UIViewControllerRepresentable {
             
             let image = scan.imageOfPage(at: 0)
 
-            // Persist image efficiently on background queue
+            // Persist image efficiently on background queue using ZIP compression
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                print("Starting image save process...")
-                var finalURL: URL? = FileStorage.save(image: image)
+                print("Starting ZIP compression process...")
+                let result = StorageManager.shared.saveReceiptImageAsZip(image, compressionQuality: 0.7)
+                var finalURL: URL? = result.zipURL
+                
                 if finalURL == nil {
                     // Fallback: try saving to temporary directory so we can still proceed to edit screen
                     let timestamp = Int(Date().timeIntervalSince1970)
@@ -87,6 +89,11 @@ struct ScannerContainer: UIViewControllerRepresentable {
                     } else {
                         print("Failed to generate JPEG data for fallback save")
                     }
+                } else {
+                    print("ZIP compression completed successfully")
+                    print("Original size: \(result.originalSize) bytes, Compressed size: \(result.compressedSize) bytes")
+                    let compressionRatio = Double(result.compressedSize) / Double(result.originalSize) * 100
+                    print("Compression ratio: \(String(format: "%.1f", compressionRatio))%")
                 }
 
                 guard let url = finalURL else {

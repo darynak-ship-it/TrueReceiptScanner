@@ -38,6 +38,10 @@ struct EditExpenseView: View {
     let onSaved: () -> Void
     @State private var showReceiptViewer: Bool = false
     @Environment(\.managedObjectContext) private var viewContext
+    
+    @AppStorage("defaultCurrency") private var defaultCurrency: String = "USD"
+    @AppStorage("defaultCategory") private var defaultCategory: String = "Other"
+    @StateObject private var themeManager = ThemeManager.shared
 
     // Editable fields
     @State private var merchantName: String = ""
@@ -57,12 +61,51 @@ struct EditExpenseView: View {
     @State private var showSavedAlert: Bool = false
     @State private var showErrorAlert: Bool = false
     @State private var errorMessage: String = ""
+    
+    // Currency and category options
+    private let currencies: [Currency] = [
+        Currency(code: "CAD", flag: "🇨🇦"),
+        Currency(code: "CHF", flag: "🇨🇭"),
+        Currency(code: "CZK", flag: "🇨🇿"),
+        Currency(code: "DKK", flag: "🇩🇰"),
+        Currency(code: "EUR", flag: "🇪🇺"),
+        Currency(code: "GBP", flag: "🇬🇧"),
+        Currency(code: "HUF", flag: "🇭🇺"),
+        Currency(code: "INR", flag: "🇮🇳"),
+        Currency(code: "JPY", flag: "🇯🇵"),
+        Currency(code: "KRW", flag: "🇰🇷"),
+        Currency(code: "MXN", flag: "🇲🇽"),
+        Currency(code: "NOK", flag: "🇳🇴"),
+        Currency(code: "PLN", flag: "🇵🇱"),
+        Currency(code: "RON", flag: "🇷🇴"),
+        Currency(code: "SEK", flag: "🇸🇪"),
+        Currency(code: "USD", flag: "🇺🇸")
+    ]
+    
+    private let categories: [Category] = [
+        Category(name: "Travel expenses", emoji: "🧳"),
+        Category(name: "Food & Dining", emoji: "🍽️"),
+        Category(name: "Accommodation", emoji: "🏨"),
+        Category(name: "Office supplies", emoji: "📎"),
+        Category(name: "Technology and equipment", emoji: "🖥️"),
+        Category(name: "Software and subscriptions", emoji: "🛠️"),
+        Category(name: "Education", emoji: "📚"),
+        Category(name: "Professional memberships", emoji: "🪪"),
+        Category(name: "Home office expenses", emoji: "🏡"),
+        Category(name: "Uniform", emoji: "🥋"),
+        Category(name: "Sports", emoji: "💪"),
+        Category(name: "Health", emoji: "❤️‍🩹"),
+        Category(name: "Communication expenses", emoji: "☎️"),
+        Category(name: "Relocation expenses", emoji: "📦"),
+        Category(name: "Client-related expenses", emoji: "🤝"),
+        Category(name: "Other", emoji: "🗂️")
+    ]
 
     var body: some View {
             ScrollView {
             VStack(spacing: 16) {
                 // Small preview at the very top (tap to view full receipt)
-                let previewImage = UIImage(contentsOfFile: imageURL.path) ?? SampleReceiptGenerator.generate()
+                let previewImage = loadImageFromURL(imageURL) ?? SampleReceiptGenerator.generate()
                 if let thumb = previewImage {
                     Button(action: { showReceiptViewer = true }) {
                         HStack(spacing: 12) {
@@ -91,7 +134,7 @@ struct EditExpenseView: View {
                             .font(.headline)
                         TextField("Item 1: Sample Item", text: $merchantName)
                             .padding(12)
-                            .background(Color.white)
+                            .background(themeManager.textFieldBackgroundColor)
                             .cornerRadius(8)
                     }
 
@@ -113,7 +156,7 @@ struct EditExpenseView: View {
                             TextField("0.0", text: $totalAmountText)
                                 .keyboardType(.decimalPad)
                                 .padding(12)
-                                .background(Color.white)
+                                .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
                             Button(action: { showCurrencySheet = true }) {
                                 HStack(spacing: 6) {
@@ -179,10 +222,10 @@ struct EditExpenseView: View {
                             }
                             TextField("", text: $tagsText)
                                 .padding(12)
-                                .background(Color.white.opacity(0.001))
+                                .background(themeManager.textFieldBackgroundColor)
                         }
                         .padding(12)
-                        .background(Color.white)
+                        .background(themeManager.secondaryBackgroundColor)
                         .cornerRadius(8)
                     }
 
@@ -200,10 +243,10 @@ struct EditExpenseView: View {
                             TextEditor(text: $notes)
                                 .frame(minHeight: 120)
                             .padding(8)
-                                .background(Color.clear)
+                                .background(themeManager.textFieldBackgroundColor)
                         }
                         .padding(12)
-                        .background(Color.white)
+                        .background(themeManager.secondaryBackgroundColor)
                             .cornerRadius(8)
                     }
 
@@ -234,15 +277,24 @@ struct EditExpenseView: View {
                     .foregroundColor(.accentColor)
             }
         }
-        .onAppear(perform: prefillFromOCR)
+        .onAppear {
+            prefillFromOCR()
+            // Set default currency and category from settings
+            if let defaultCurrencyObj = currencies.first(where: { $0.code == defaultCurrency }) {
+                selectedCurrency = defaultCurrencyObj
+            }
+            if let defaultCategoryObj = categories.first(where: { $0.name == defaultCategory }) {
+                selectedCategory = defaultCategoryObj
+            }
+        }
         .sheet(isPresented: $showCurrencySheet) {
-            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet)
+            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
         }
         .sheet(isPresented: $showCategorySheet) {
-            CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet)
+            CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet, themeManager: themeManager)
         }
         .sheet(isPresented: $showPaymentSheet) {
-            PaymentPickerView(selected: $selectedPayment, isPresented: $showPaymentSheet)
+            PaymentPickerView(selected: $selectedPayment, isPresented: $showPaymentSheet, themeManager: themeManager)
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }
@@ -253,7 +305,7 @@ struct EditExpenseView: View {
             Text(errorMessage)
         }
         .fullScreenCover(isPresented: $showReceiptViewer) {
-            let fullImage = UIImage(contentsOfFile: imageURL.path) ?? SampleReceiptGenerator.generate()
+            let fullImage = loadImageFromURL(imageURL) ?? SampleReceiptGenerator.generate()
             NavigationStack {
                 ZStack {
                     Color.black.ignoresSafeArea()
@@ -296,13 +348,20 @@ struct EditExpenseView: View {
         // The image was already saved during the scanning process in ScannerContainer
         let finalImageURL = imageURL
         
-        // Create thumbnail if needed (for better performance in lists)
+        // For ZIP files, we don't need a separate thumbnail as it's included in the ZIP
+        // For regular files, create thumbnail if needed
         let thumbnailURL: URL?
+        if imageURL.pathExtension.lowercased() == "zip" {
+            // ZIP files contain both image and thumbnail
+            thumbnailURL = nil
+        } else {
+            // Regular files need separate thumbnail
         if let image = UIImage(contentsOfFile: imageURL.path) {
             let thumbnailResult = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.3)
             thumbnailURL = thumbnailResult.thumbnailURL
         } else {
             thumbnailURL = nil
+            }
         }
         
         // Create receipt directly in Core Data
@@ -325,6 +384,36 @@ struct EditExpenseView: View {
         receipt.isManualEntry = false
         receipt.createdAt = Date()
         receipt.updatedAt = Date()
+        
+        // Set compression metadata
+        if imageURL.pathExtension.lowercased() == "zip" {
+            receipt.compressionType = "zip"
+            // Get file sizes for compression metadata
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: imageURL.path)
+                receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
+                // Estimate original size (ZIP typically compresses to 60-70% of original)
+                receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
+                receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
+            } catch {
+                receipt.compressionType = "zip"
+                receipt.originalFileSize = 0
+                receipt.compressedFileSize = 0
+                receipt.compressionRatio = 0.0
+            }
+        } else {
+            receipt.compressionType = "none"
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: imageURL.path)
+                receipt.originalFileSize = attributes[.size] as? Int64 ?? 0
+                receipt.compressedFileSize = receipt.originalFileSize
+                receipt.compressionRatio = 1.0
+            } catch {
+                receipt.originalFileSize = 0
+                receipt.compressedFileSize = 0
+                receipt.compressionRatio = 1.0
+            }
+        }
         
         // Save to Core Data
         do {
@@ -438,7 +527,7 @@ struct EditExpenseView: View {
                 ]
                 
                 for format in formatters {
-                    let formatter = DateFormatter()
+            let formatter = DateFormatter()
                     formatter.dateFormat = format
                     if let parsedDate = formatter.date(from: dateStr) {
                         date = parsedDate
@@ -597,6 +686,17 @@ struct EditExpenseView: View {
             return false
         }
     }
+    
+    /// Loads image from URL, handling both regular files and ZIP archives
+    private func loadImageFromURL(_ url: URL) -> UIImage? {
+        // Check if it's a ZIP file
+        if url.pathExtension.lowercased() == "zip" {
+            return StorageManager.shared.loadImageFromZip(zipURL: url)
+        } else {
+            // Regular file
+            return UIImage(contentsOfFile: url.path)
+        }
+    }
 }
 
 // MARK: - Currency Picker
@@ -604,6 +704,7 @@ struct EditExpenseView: View {
 private struct CurrencyPickerView: View {
     @Binding var selected: Currency
     @Binding var isPresented: Bool
+    @ObservedObject var themeManager: ThemeManager
 
     private let currencies: [Currency] = [
         Currency(code: "CAD", flag: "🇨🇦"),
@@ -635,6 +736,7 @@ private struct CurrencyPickerView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { selected = curr }
+                .listRowBackground(curr == selected ? themeManager.selectionColor : Color.clear)
             }
             .navigationTitle("Currency")
             .toolbar {
@@ -659,6 +761,7 @@ private struct CategoryPickerView: View {
     @Binding var isPresented: Bool
     @State private var showCreate: Bool = false
     @State private var draftCategory: Category = Category(name: "", emoji: "")
+    @ObservedObject var themeManager: ThemeManager
 
     private var presets: [Category] {
         [
@@ -694,6 +797,7 @@ private struct CategoryPickerView: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture { selected = cat }
+                        .listRowBackground(cat == selected ? themeManager.selectionColor : Color.clear)
                     }
                 }
 
@@ -759,6 +863,7 @@ private struct CategoryPickerView: View {
 private struct PaymentPickerView: View {
     @Binding var selected: PaymentMethod
     @Binding var isPresented: Bool
+    @ObservedObject var themeManager: ThemeManager
 
     private let methods: [PaymentMethod] = [
         PaymentMethod(name: "Credit Card", emoji: "💳"),
@@ -782,6 +887,7 @@ private struct PaymentPickerView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { selected = method }
+                .listRowBackground(method == selected ? themeManager.selectionColor : Color.clear)
             }
             .navigationTitle("Payment Method")
             .toolbar {

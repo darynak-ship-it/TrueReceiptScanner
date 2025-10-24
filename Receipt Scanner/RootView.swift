@@ -10,6 +10,7 @@ import AVFoundation
 
 struct RootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var showScanner: Bool = false
     @State private var scannedImageURL: URL? = nil
     @State private var recognizedText: String = ""
@@ -22,6 +23,8 @@ struct RootView: View {
     @State private var showManualExpense: Bool = false
     @State private var showCreateReport: Bool = false
     @State private var showReceiptsList: Bool = false
+    @State private var showSettings: Bool = false
+    @State private var showSupport: Bool = false
 
     var body: some View {
         Group {
@@ -61,8 +64,8 @@ struct RootView: View {
                 // Dashboard for subsequent app opens
                 NavigationStack {
                     DashboardView(
-                        onOpenSettings: {},
-                        onOpenHelp: {},
+                        onOpenSettings: { showSettings = true },
+                        onOpenHelp: { showSupport = true },
                         onOpenReceipts: { showReceiptsList = true },
                         onOpenReports: {},
                         onScanReceipt: { requestCameraPermissionAndScan() },
@@ -132,6 +135,12 @@ struct RootView: View {
                 ReceiptsListView()
             }
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
+        .sheet(isPresented: $showSupport) {
+            SupportView()
+        }
         .alert("Camera Permission Required", isPresented: $showPermissionAlert) {
             Button("Settings") {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
@@ -151,6 +160,7 @@ struct RootView: View {
         .onAppear {
             checkCameraPermission()
         }
+        .preferredColorScheme(themeManager.colorScheme)
     }
 
     private func checkCameraPermission() {

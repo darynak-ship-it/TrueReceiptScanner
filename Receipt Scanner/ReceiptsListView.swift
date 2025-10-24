@@ -106,6 +106,7 @@ struct ReceiptsListView: View {
 
 struct SearchBar: View {
     @Binding var text: String
+    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         HStack {
@@ -124,7 +125,7 @@ struct SearchBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(themeManager.secondaryBackgroundColor)
         .cornerRadius(12)
     }
 }

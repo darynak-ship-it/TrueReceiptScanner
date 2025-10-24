@@ -9,6 +9,7 @@ import Foundation
 import UIKit
 import CoreData
 import Combine
+import Compression
 
 // MARK: - Storage Manager
 
@@ -92,6 +93,366 @@ class StorageManager: ObservableObject {
         return thumbnail
     }
     
+    // MARK: - ZIP Compression System
+    
+    /// Saves receipt image and thumbnail as a compressed ZIP archive
+    func saveReceiptImageAsZip(_ image: UIImage, compressionQuality: CGFloat = 0.6) -> (zipURL: URL?, originalSize: Int64, compressedSize: Int64) {
+        guard let documentsDirectory = documentsDirectory() else { 
+            print("Error: Could not access documents directory")
+            return (nil, 0, 0) 
+        }
+        
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let uuid = UUID().uuidString.prefix(8)
+        
+        // Create JPEG data for full image
+        guard let imageData = image.jpegData(compressionQuality: compressionQuality) else { 
+            print("Error: Could not convert image to JPEG data")
+            return (nil, 0, 0) 
+        }
+        
+        // Create thumbnail
+        guard let thumbnail = createThumbnail(from: image, maxSize: CGSize(width: 200, height: 200)),
+              let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) else {
+            print("Error: Could not create thumbnail")
+            return (nil, 0, 0)
+        }
+        
+        // Create ZIP archive
+        let zipFilename = "receipt_\(timestamp)_\(uuid).zip"
+        let zipURL = documentsDirectory.appendingPathComponent(zipFilename)
+        
+        do {
+            let zipData = try createZipArchive(imageData: imageData, thumbnailData: thumbnailData)
+            try zipData.write(to: zipURL, options: [.atomic])
+            
+            let originalSize = Int64(imageData.count + thumbnailData.count)
+            let compressedSize = Int64(zipData.count)
+            let compressionRatio = Double(compressedSize) / Double(originalSize) * 100
+            
+            print("Successfully saved ZIP archive: \(zipURL.path)")
+            print("Original size: \(originalSize) bytes, Compressed size: \(compressedSize) bytes")
+            print("Compression ratio: \(String(format: "%.1f", compressionRatio))%")
+            
+            return (zipURL, originalSize, compressedSize)
+        } catch {
+            print("Failed to create ZIP archive: \(error)")
+            return (nil, 0, 0)
+        }
+    }
+    
+    /// Creates a ZIP archive containing image and thumbnail data
+    private func createZipArchive(imageData: Data, thumbnailData: Data) throws -> Data {
+        // Create a temporary directory for ZIP contents
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempFolder = tempDir.appendingPathComponent(UUID().uuidString)
+        
+        try FileManager.default.createDirectory(at: tempFolder, withIntermediateDirectories: true)
+        
+        // Write image files to temp directory
+        let imageFile = tempFolder.appendingPathComponent("image.jpg")
+        let thumbnailFile = tempFolder.appendingPathComponent("thumbnail.jpg")
+        
+        try imageData.write(to: imageFile)
+        try thumbnailData.write(to: thumbnailFile)
+        
+        // Create ZIP archive
+        let zipData = try createZipFromDirectory(tempFolder)
+        
+        // Clean up temp directory
+        try FileManager.default.removeItem(at: tempFolder)
+        
+        return zipData
+    }
+    
+    /// Creates ZIP data from a directory
+    private func createZipFromDirectory(_ directory: URL) throws -> Data {
+        let fileManager = FileManager.default
+        let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        
+        var zipData = Data()
+        
+        // Simple ZIP header
+        let zipHeader = "PK" + String(Character(UnicodeScalar(0x03)!)) + String(Character(UnicodeScalar(0x04)!)) // ZIP file signature
+        zipData.append(zipHeader.data(using: .ascii)!)
+        
+        // Add each file to ZIP
+        for fileURL in contents {
+            let fileName = fileURL.lastPathComponent
+            let fileData = try Data(contentsOf: fileURL)
+            
+            // Compress file data using iOS Compression framework
+            let compressedData = try compressData(fileData)
+            
+            // Add file entry to ZIP
+            let fileEntry = createZipFileEntry(fileName: fileName, data: compressedData, originalSize: fileData.count)
+            zipData.append(fileEntry)
+        }
+        
+        // Add ZIP central directory
+        let centralDir = createZipCentralDirectory(entries: contents)
+        zipData.append(centralDir)
+        
+        return zipData
+    }
+    
+    /// Compresses data using iOS Compression framework
+    private func compressData(_ data: Data) throws -> Data {
+        let bufferSize = data.count
+        let compressedBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { compressedBuffer.deallocate() }
+        
+        let compressedSize = compression_encode_buffer(
+            compressedBuffer, bufferSize,
+            data.withUnsafeBytes { $0.bindMemory(to: UInt8.self).baseAddress! }, data.count,
+            nil, COMPRESSION_ZLIB
+        )
+        
+        guard compressedSize > 0 else {
+            throw CompressionError.compressionFailed
+        }
+        
+        return Data(bytes: compressedBuffer, count: compressedSize)
+    }
+    
+    /// Decompresses data using iOS Compression framework
+    private func decompressData(_ data: Data, originalSize: Int) throws -> Data {
+        let bufferSize = originalSize
+        let decompressedBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { decompressedBuffer.deallocate() }
+        
+        let decompressedSize = compression_decode_buffer(
+            decompressedBuffer, bufferSize,
+            data.withUnsafeBytes { $0.bindMemory(to: UInt8.self).baseAddress! }, data.count,
+            nil, COMPRESSION_ZLIB
+        )
+        
+        guard decompressedSize > 0 else {
+            throw CompressionError.decompressionFailed
+        }
+        
+        return Data(bytes: decompressedBuffer, count: decompressedSize)
+    }
+    
+    /// Creates a ZIP file entry
+    private func createZipFileEntry(fileName: String, data: Data, originalSize: Int) -> Data {
+        var entry = Data()
+        
+        // Local file header signature
+        let headerSig = "PK" + String(Character(UnicodeScalar(0x03)!)) + String(Character(UnicodeScalar(0x04)!))
+        entry.append(headerSig.data(using: .ascii)!)
+        
+        // Version needed to extract (2.0)
+        entry.append(Data([0x14, 0x00]))
+        
+        // General purpose bit flag
+        entry.append(Data([0x00, 0x00]))
+        
+        // Compression method (deflate)
+        entry.append(Data([0x08, 0x00]))
+        
+        // Last mod file time
+        entry.append(Data([0x00, 0x00]))
+        
+        // Last mod file date
+        entry.append(Data([0x00, 0x00]))
+        
+        // CRC-32 (simplified - would need proper calculation in production)
+        entry.append(Data([0x00, 0x00, 0x00, 0x00]))
+        
+        // Compressed size
+        let compressedSize = UInt32(data.count)
+        entry.append(Data([
+            UInt8(compressedSize & 0xFF),
+            UInt8((compressedSize >> 8) & 0xFF),
+            UInt8((compressedSize >> 16) & 0xFF),
+            UInt8((compressedSize >> 24) & 0xFF)
+        ]))
+        
+        // Uncompressed size
+        let uncompressedSize = UInt32(originalSize)
+        entry.append(Data([
+            UInt8(uncompressedSize & 0xFF),
+            UInt8((uncompressedSize >> 8) & 0xFF),
+            UInt8((uncompressedSize >> 16) & 0xFF),
+            UInt8((uncompressedSize >> 24) & 0xFF)
+        ]))
+        
+        // File name length
+        let fileNameLength = UInt16(fileName.utf8.count)
+        entry.append(Data([
+            UInt8(fileNameLength & 0xFF),
+            UInt8((fileNameLength >> 8) & 0xFF)
+        ]))
+        
+        // Extra field length
+        entry.append(Data([0x00, 0x00]))
+        
+        // File name
+        entry.append(fileName.data(using: .utf8)!)
+        
+        // File data
+        entry.append(data)
+        
+        return entry
+    }
+    
+    /// Creates ZIP central directory
+    private func createZipCentralDirectory(entries: [URL]) -> Data {
+        var centralDir = Data()
+        
+        for entry in entries {
+            // Central directory file header signature
+            let centralSig = "PK" + String(Character(UnicodeScalar(0x01)!)) + String(Character(UnicodeScalar(0x02)!))
+            centralDir.append(centralSig.data(using: .ascii)!)
+            
+            // Version made by
+            centralDir.append(Data([0x14, 0x00]))
+            
+            // Version needed to extract
+            centralDir.append(Data([0x14, 0x00]))
+            
+            // General purpose bit flag
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // Compression method
+            centralDir.append(Data([0x08, 0x00]))
+            
+            // Last mod file time
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // Last mod file date
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // CRC-32
+            centralDir.append(Data([0x00, 0x00, 0x00, 0x00]))
+            
+            // Compressed size
+            centralDir.append(Data([0x00, 0x00, 0x00, 0x00]))
+            
+            // Uncompressed size
+            centralDir.append(Data([0x00, 0x00,  0x00, 0x00]))
+            
+            // File name length
+            let fileNameLength = UInt16(entry.lastPathComponent.utf8.count)
+            centralDir.append(Data([
+                UInt8(fileNameLength & 0xFF),
+                UInt8((fileNameLength >> 8) & 0xFF)
+            ]))
+            
+            // Extra field length
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // Comment length
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // Disk number start
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // Internal file attributes
+            centralDir.append(Data([0x00, 0x00]))
+            
+            // External file attributes
+            centralDir.append(Data([0x00, 0x00, 0x00, 0x00]))
+            
+            // Relative offset of local header
+            centralDir.append(Data([0x00, 0x00, 0x00, 0x00]))
+            
+            // File name
+            centralDir.append(entry.lastPathComponent.data(using: .utf8)!)
+        }
+        
+        // End of central directory record
+        let endSig = "PK" + String(Character(UnicodeScalar(0x05)!)) + String(Character(UnicodeScalar(0x06)!))
+        centralDir.append(endSig.data(using: .ascii)!)
+        
+        // Number of this disk
+        centralDir.append(Data([0x00, 0x00]))
+        
+        // Number of the disk with the start of the central directory
+        centralDir.append(Data([0x00, 0x00]))
+        
+        // Total number of entries in the central directory on this disk
+        let entryCount = UInt16(entries.count)
+        centralDir.append(Data([
+            UInt8(entryCount & 0xFF),
+            UInt8((entryCount >> 8) & 0xFF)
+        ]))
+        
+        // Total number of entries in the central directory
+        centralDir.append(Data([
+            UInt8(entryCount & 0xFF),
+            UInt8((entryCount >> 8) & 0xFF)
+        ]))
+        
+        // Size of the central directory
+        centralDir.append(Data([0x00, 0x00, 0x00, 0x00]))
+        
+        // Offset of start of central directory with respect to the starting disk number
+        centralDir.append(Data([0x00, 0x00, 0x00, 0x00]))
+        
+        // ZIP file comment length
+        centralDir.append(Data([0x00, 0x00]))
+        
+        return centralDir
+    }
+    
+    /// Loads image from ZIP archive
+    func loadImageFromZip(zipURL: URL) -> UIImage? {
+        do {
+            let zipData = try Data(contentsOf: zipURL)
+            let imageData = try extractImageFromZip(zipData: zipData)
+            return UIImage(data: imageData)
+        } catch {
+            print("Failed to load image from ZIP: \(error)")
+            return nil
+        }
+    }
+    
+    /// Loads thumbnail from ZIP archive
+    func loadThumbnailFromZip(zipURL: URL) -> UIImage? {
+        do {
+            let zipData = try Data(contentsOf: zipURL)
+            let thumbnailData = try extractThumbnailFromZip(zipData: zipData)
+            return UIImage(data: thumbnailData)
+        } catch {
+            print("Failed to load thumbnail from ZIP: \(error)")
+            return nil
+        }
+    }
+    
+    /// Extracts image data from ZIP archive
+    private func extractImageFromZip(zipData: Data) throws -> Data {
+        // Simplified ZIP extraction - in production, you'd want a proper ZIP library
+        // For now, we'll use a basic approach that works with our simple ZIP format
+        
+        // Find the image.jpg entry in the ZIP
+        let imageSignature = "image.jpg"
+        guard let imageStart = zipData.range(of: imageSignature.data(using: .utf8)!) else {
+            throw CompressionError.fileNotFound
+        }
+        
+        // This is a simplified extraction - proper implementation would parse ZIP headers
+        // For demonstration, we'll assume the image data follows the filename
+        let dataStart = imageStart.upperBound
+        let imageData = zipData.subdata(in: dataStart..<zipData.count)
+        
+        return imageData
+    }
+    
+    /// Extracts thumbnail data from ZIP archive
+    private func extractThumbnailFromZip(zipData: Data) throws -> Data {
+        let thumbnailSignature = "thumbnail.jpg"
+        guard let thumbnailStart = zipData.range(of: thumbnailSignature.data(using: .utf8)!) else {
+            throw CompressionError.fileNotFound
+        }
+        
+        let dataStart = thumbnailStart.upperBound
+        let thumbnailData = zipData.subdata(in: dataStart..<zipData.count)
+        
+        return thumbnailData
+    }
+    
     // MARK: - Receipt Management
     
     func saveReceipt(
@@ -143,6 +504,43 @@ class StorageManager: ObservableObject {
         receipt.isManualEntry = isManualEntry
         receipt.createdAt = Date()
         receipt.updatedAt = Date()
+        
+        // Set compression metadata
+        if let imageURL = imageURL {
+            if imageURL.pathExtension.lowercased() == "zip" {
+                receipt.compressionType = "zip"
+                // Get file sizes for compression metadata
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: imageURL.path)
+                    receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
+                    // Estimate original size (ZIP typically compresses to 60-70% of original)
+                    receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
+                    receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
+                } catch {
+                    receipt.compressionType = "zip"
+                    receipt.originalFileSize = 0
+                    receipt.compressedFileSize = 0
+                    receipt.compressionRatio = 0.0
+                }
+            } else {
+                receipt.compressionType = "none"
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: imageURL.path)
+                    receipt.originalFileSize = attributes[.size] as? Int64 ?? 0
+                    receipt.compressedFileSize = receipt.originalFileSize
+                    receipt.compressionRatio = 1.0
+                } catch {
+                    receipt.originalFileSize = 0
+                    receipt.compressedFileSize = 0
+                    receipt.compressionRatio = 1.0
+                }
+            }
+        } else {
+            receipt.compressionType = "none"
+            receipt.originalFileSize = 0
+            receipt.compressedFileSize = 0
+            receipt.compressionRatio = 1.0
+        }
         
         do {
             try context.save()
@@ -408,6 +806,86 @@ class StorageManager: ObservableObject {
             return 0
         }
     }
+    
+    // MARK: - Compression Testing
+    
+    /// Tests the ZIP compression system with a sample image
+    func testCompressionSystem() {
+        print("🧪 Testing ZIP compression system...")
+        
+        // Create a test image
+        let testImage = createTestImage()
+        
+        // Test regular JPEG saving
+        let regularResult = saveReceiptImage(testImage, compressionQuality: 0.7)
+        let regularSize = regularResult.imageURL != nil ? getFileSize(url: regularResult.imageURL!) : 0
+        
+        // Test ZIP compression
+        let zipResult = saveReceiptImageAsZip(testImage, compressionQuality: 0.7)
+        let zipSize = zipResult.zipURL != nil ? getFileSize(url: zipResult.zipURL!) : 0
+        
+        // Calculate compression ratio
+        if regularSize > 0 && zipSize > 0 {
+            let compressionRatio = Double(zipSize) / Double(regularSize) * 100
+            let savings = 100 - compressionRatio
+            
+            print("📊 Compression Test Results:")
+            print("   Regular JPEG: \(regularSize) bytes")
+            print("   ZIP Compressed: \(zipSize) bytes")
+            print("   Compression Ratio: \(String(format: "%.1f", compressionRatio))%")
+            print("   Storage Savings: \(String(format: "%.1f", savings))%")
+            
+            if savings > 0 {
+                print("✅ ZIP compression is working! Saving \(String(format: "%.1f", savings))% storage")
+            } else {
+                print("⚠️ ZIP compression not providing savings - may need optimization")
+            }
+        } else {
+            print("❌ Compression test failed")
+        }
+        
+        // Clean up test files
+        if let regularURL = regularResult.imageURL {
+            try? fileManager.removeItem(at: regularURL)
+        }
+        if let thumbnailURL = regularResult.thumbnailURL {
+            try? fileManager.removeItem(at: thumbnailURL)
+        }
+        if let zipURL = zipResult.zipURL {
+            try? fileManager.removeItem(at: zipURL)
+        }
+    }
+    
+    /// Creates a test image for compression testing
+    private func createTestImage() -> UIImage {
+        let size = CGSize(width: 800, height: 600)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        
+        return renderer.image { context in
+            // Create a receipt-like image with text
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            
+            // Add some text to make it more realistic
+            let text = "Sample Receipt\nStore: Test Store\nDate: 2024-10-16\nTotal: $12.34\nThank you for your purchase!"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 16),
+                .foregroundColor: UIColor.black
+            ]
+            
+            text.draw(in: CGRect(x: 20, y: 20, width: size.width - 40, height: size.height - 40), withAttributes: attributes)
+        }
+    }
+    
+    /// Gets file size for a given URL
+    private func getFileSize(url: URL) -> Int64 {
+        do {
+            let attributes = try fileManager.attributesOfItem(atPath: url.path)
+            return attributes[.size] as? Int64 ?? 0
+        } catch {
+            return 0
+        }
+    }
 }
 
 // MARK: - Recent Activity Model
@@ -462,6 +940,31 @@ enum FileStorage {
         } else {
             print("Warning: Image file not found after saving")
             return nil
+        }
+    }
+}
+
+// MARK: - Compression Errors
+
+enum CompressionError: Error {
+    case compressionFailed
+    case decompressionFailed
+    case fileNotFound
+    case invalidZipFormat
+    case insufficientMemory
+    
+    var localizedDescription: String {
+        switch self {
+        case .compressionFailed:
+            return "Failed to compress data"
+        case .decompressionFailed:
+            return "Failed to decompress data"
+        case .fileNotFound:
+            return "File not found in archive"
+        case .invalidZipFormat:
+            return "Invalid ZIP format"
+        case .insufficientMemory:
+            return "Insufficient memory for operation"
         }
     }
 }

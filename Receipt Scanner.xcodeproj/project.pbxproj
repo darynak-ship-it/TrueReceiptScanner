@@ -255,8 +255,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to scan receipts and documents.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs photo library access to select receipt images from your gallery.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save scanned receipts to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs photo library access to select receipt images from your gallery.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -302,8 +302,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to scan receipts and documents.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs photo library access to select receipt images from your gallery.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save scanned receipts to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs photo library access to select receipt images from your gallery.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
