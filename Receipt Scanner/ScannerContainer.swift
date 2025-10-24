@@ -60,9 +60,7 @@ struct ScannerContainer: UIViewControllerRepresentable {
             // Use the first page (typical for receipts)
             guard scan.pageCount > 0 else {
                 DispatchQueue.main.async { [weak self] in
-                    controller.dismiss(animated: true) {
-                        self?.onComplete(.failure(NSError(domain: "Scanner", code: 0, userInfo: [NSLocalizedDescriptionKey: "No pages scanned"])))
-                    }
+                    self?.onComplete(.failure(NSError(domain: "Scanner", code: 0, userInfo: [NSLocalizedDescriptionKey: "No pages scanned"])))
                 }
                 return
             }
@@ -94,9 +92,7 @@ struct ScannerContainer: UIViewControllerRepresentable {
                 guard let url = finalURL else {
                     print("Failed to save image to disk (both documents and temp)")
                     DispatchQueue.main.async {
-                        controller.dismiss(animated: true) {
-                            self?.onComplete(.failure(NSError(domain: "Scanner", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not save scanned image."])))
-                        }
+                        self?.onComplete(.failure(NSError(domain: "Scanner", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not save scanned image."])))
                     }
                     return
                 }
@@ -107,9 +103,7 @@ struct ScannerContainer: UIViewControllerRepresentable {
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     print("Image file not found after saving at: \(url.path)")
                     DispatchQueue.main.async {
-                        controller.dismiss(animated: true) {
-                            self?.onComplete(.failure(NSError(domain: "Scanner", code: 3, userInfo: [NSLocalizedDescriptionKey: "Image file not found after saving."])))
-                        }
+                        self?.onComplete(.failure(NSError(domain: "Scanner", code: 3, userInfo: [NSLocalizedDescriptionKey: "Image file not found after saving."])))
                     }
                     return
                 }
@@ -118,14 +112,11 @@ struct ScannerContainer: UIViewControllerRepresentable {
                 // Perform OCR in background for quality
                 OCRTextRecognizer.recognizeText(from: image) { [weak self] text in
                     print("OCR completed with text: \(text?.prefix(50) ?? "nil")")
+                    let output = ScannerOutput(imageURL: url, recognizedText: text ?? "")
+                    print("Scanner output created - calling completion")
                     DispatchQueue.main.async {
-                        controller.dismiss(animated: true) {
-                            DispatchQueue.main.async {
-                                let output = ScannerOutput(imageURL: url, recognizedText: text ?? "")
-                                print("Scanner output created - calling completion")
-                                self?.onComplete(.success(output))
-                            }
-                        }
+                        // Don't dismiss here - let the parent view handle dismissal via showScanner binding
+                        self?.onComplete(.success(output))
                     }
                 }
             }
@@ -133,17 +124,13 @@ struct ScannerContainer: UIViewControllerRepresentable {
 
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
             DispatchQueue.main.async { [weak self] in
-                controller.dismiss(animated: true) {
-                    self?.onComplete(.failure(NSError(domain: "Scanner", code: 2, userInfo: [NSLocalizedDescriptionKey: "User cancelled"])))
-                }
+                self?.onComplete(.failure(NSError(domain: "Scanner", code: 2, userInfo: [NSLocalizedDescriptionKey: "User cancelled"])))
             }
         }
 
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
             DispatchQueue.main.async { [weak self] in
-                controller.dismiss(animated: true) {
-                    self?.onComplete(.failure(error))
-                }
+                self?.onComplete(.failure(error))
             }
         }
     }

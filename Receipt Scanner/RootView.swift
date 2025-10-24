@@ -73,22 +73,24 @@ struct RootView: View {
                 }
             }
         }
-        .sheet(isPresented: $showScanner) {
+        .sheet(isPresented: $showScanner, onDismiss: {
+            print("Scanner sheet dismissed")
+        }) {
             ScannerContainer { result in
-                showScanner = false
+                print("ScannerContainer completion handler called")
                 switch result {
                 case .success(let output):
                     print("Scanner completed successfully - Image URL: \(output.imageURL)")
                     print("Scanner completed successfully - OCR Text: \(output.recognizedText)")
-                    // Use async to ensure sheet dismissal completes before updating state
-                    DispatchQueue.main.async {
-                        self.scannedImageURL = output.imageURL
-                        self.recognizedText = output.recognizedText
-                    }
+                    // Update state BEFORE dismissing sheet
+                    self.scannedImageURL = output.imageURL
+                    self.recognizedText = output.recognizedText
+                    print("State updated - scannedImageURL: \(String(describing: self.scannedImageURL))")
+                    // Dismiss scanner sheet after state is updated
+                    self.showScanner = false
                 case .failure(let error):
                     print("Scanner error: \(error.localizedDescription)")
-                    // Handle error appropriately
-                    break
+                    self.showScanner = false
                 }
             }
         }

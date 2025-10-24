@@ -345,28 +345,235 @@ struct EditExpenseView: View {
         }
     }
 
-    // Very lightweight heuristics based on recognizedText
+    // Enhanced OCR text parsing and prefill logic
     private func prefillFromOCR() {
         let text = recognizedText
-        if merchantName.isEmpty {
-            if let m = firstMatch(in: text, pattern: "(?:Store|Merchant)[:\\t ]+(.+)") {
-                merchantName = m
-            } else if let firstLine = text.split(separator: "\n").first, !firstLine.lowercased().contains("receipt") {
-                merchantName = String(firstLine).trimmingCharacters(in: .whitespaces)
+        print("Prefilling from OCR text: \(text)")
+        
+        // Extract merchant name
+        extractMerchantName(from: text)
+        
+        // Extract date
+        extractDate(from: text)
+        
+        // Extract amount and currency
+        extractAmountAndCurrency(from: text)
+        
+        // Extract category based on merchant name or keywords
+        extractCategory(from: text)
+        
+        print("Prefilled fields - Merchant: '\(merchantName)', Amount: '\(totalAmountText)', Currency: '\(selectedCurrency.code)', Date: \(date)")
+    }
+    
+    private func extractMerchantName(from text: String) {
+        if !merchantName.isEmpty { return }
+        
+        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        
+        // Try various patterns for merchant name
+        let merchantPatterns = [
+            // Explicit merchant/store labels
+            "(?:Store|Merchant|Company|Business|Restaurant|Hotel|Shop)[:\\s]+(.+)",
+            // Common receipt headers
+            "^([A-Za-z][A-Za-z0-9\\s&.-]+(?:Hotel|Restaurant|Cafe|Store|Shop|Market|Center|Mall|Plaza))",
+            // First substantial line (not receipt, total, date, etc.)
+            "^([A-Za-z][A-Za-z0-9\\s&.-]{3,})$"
+        ]
+        
+        for pattern in merchantPatterns {
+            if let merchant = firstMatch(in: text, pattern: pattern) {
+                // Filter out common non-merchant words
+                let filteredMerchant = merchant.trimmingCharacters(in: .whitespaces)
+                if !filteredMerchant.lowercased().contains("receipt") &&
+                   !filteredMerchant.lowercased().contains("total") &&
+                   !filteredMerchant.lowercased().contains("date") &&
+                   !filteredMerchant.lowercased().contains("time") &&
+                   filteredMerchant.count > 2 {
+                    merchantName = filteredMerchant
+                    return
+                }
             }
         }
-
-        if let dateStr = firstMatch(in: text, pattern: "(\\d{4}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01]))") {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            if let dt = formatter.date(from: dateStr.replacingOccurrences(of: "/", with: "-")) { date = dt }
-        }
-
-        if totalAmountText.isEmpty {
-            if let tot = firstMatch(in: text, pattern: "Total[^\\n]*?([0-9]+(?:\\.[0-9]{1,2})?)") {
-                totalAmountText = tot
+        
+        // Fallback: use first non-empty line that looks like a business name
+        for line in lines {
+            if line.count > 3 && 
+               !line.lowercased().contains("receipt") &&
+               !line.lowercased().contains("total") &&
+               !line.lowercased().contains("date") &&
+               !line.lowercased().contains("time") &&
+               !line.contains("$") &&
+               !line.contains("€") &&
+               !line.contains("£") &&
+               !matchesPattern(line, pattern: "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}") {
+                merchantName = line
+                return
             }
         }
+    }
+    
+    private func extractDate(from text: String) {
+        let datePatterns = [
+            // ISO format: 2024-10-16 or 2024/10/16
+            "(\\d{4}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01]))",
+            // US format: 10/16/2024 or 10-16-2024
+            "(?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01])[-/](\\d{4})",
+            // European format: 16/10/2024 or 16-10-2024
+            "(?:0?[1-9]|[12]\\d|3[01])[-/](?:0?[1-9]|1[0-2])[-/](\\d{4})",
+            // Month name format: Oct 16, 2024 or October 16, 2024
+            "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\\s+(?:0?[1-9]|[12]\\d|3[01]),?\\s+(\\d{4})"
+        ]
+        
+        for pattern in datePatterns {
+            if let dateStr = firstMatch(in: text, pattern: pattern) {
+                let formatters = [
+                    "yyyy-MM-dd",
+                    "yyyy/MM/dd", 
+                    "MM/dd/yyyy",
+                    "MM-dd-yyyy",
+                    "dd/MM/yyyy",
+                    "dd-MM-yyyy",
+                    "MMM d, yyyy",
+                    "MMMM d, yyyy"
+                ]
+                
+                for format in formatters {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = format
+                    if let parsedDate = formatter.date(from: dateStr) {
+                        date = parsedDate
+                        return
+                    }
+                }
+            }
+        }
+    }
+    
+    private func extractAmountAndCurrency(from text: String) {
+        if !totalAmountText.isEmpty { return }
+        
+        // Currency symbols and their codes
+        let currencyMap: [String: String] = [
+            "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", 
+            "C$": "CAD", "A$": "AUD", "CHF": "CHF", "kr": "SEK",
+            "₹": "INR", "₽": "RUB", "₩": "KRW", "₪": "ILS"
+        ]
+        
+        // Amount patterns - look for various formats
+        let amountPatterns = [
+            // Total with currency symbol: $12.34, €45.67
+            "([$€£¥C$A$₹₽₩₪])\\s*([0-9]+(?:\\.[0-9]{1,2})?)",
+            // Total without currency: Total: 12.34, Amount: 45.67
+            "(?:Total|Amount|Sum|Subtotal|Grand Total)[:\\s]*([0-9]+(?:\\.[0-9]{1,2})?)",
+            // Just numbers that look like amounts: 12.34, 123.45
+            "\\b([0-9]+(?:\\.[0-9]{1,2})?)\\b"
+        ]
+        
+        var foundAmount: String?
+        var foundCurrency: String = "USD" // default
+        
+        for pattern in amountPatterns {
+            if let match = firstMatch(in: text, pattern: pattern) {
+                // Check if it contains currency symbol
+                for (symbol, code) in currencyMap {
+                    if match.contains(symbol) {
+                        foundCurrency = code
+                        // Extract just the number part
+                        if let amount = firstMatch(in: match, pattern: "([0-9]+(?:\\.[0-9]{1,2})?)") {
+                            foundAmount = amount
+                            break
+                        }
+                    }
+                }
+                
+                // If no currency symbol, check if it's a reasonable amount
+                if foundAmount == nil {
+                    let amount = match.trimmingCharacters(in: .whitespaces)
+                    if let value = Double(amount), value > 0 && value < 10000 {
+                        foundAmount = amount
+                    }
+                }
+            }
+            
+            if foundAmount != nil { break }
+        }
+        
+        if let amount = foundAmount {
+            totalAmountText = amount
+            // Update currency if we found one
+            if let currencyCode = currencyMap.values.first(where: { $0 == foundCurrency }) {
+                selectedCurrency = Currency(code: foundCurrency, flag: getFlagForCurrency(foundCurrency))
+            }
+        }
+    }
+    
+    private func extractCategory(from text: String) {
+        let merchantLower = merchantName.lowercased()
+        let textLower = text.lowercased()
+        
+        // Category mapping based on keywords
+        let categoryKeywords: [String: (String, String)] = [
+            "hotel": ("Accommodation", "🏨"),
+            "restaurant": ("Food & Dining", "🍽️"),
+            "cafe": ("Food & Dining", "🍽️"),
+            "coffee": ("Food & Dining", "🍽️"),
+            "food": ("Food & Dining", "🍽️"),
+            "dining": ("Food & Dining", "🍽️"),
+            "gas": ("Travel expenses", "🧳"),
+            "fuel": ("Travel expenses", "🧳"),
+            "station": ("Travel expenses", "🧳"),
+            "office": ("Office supplies", "📎"),
+            "supplies": ("Office supplies", "📎"),
+            "computer": ("Technology and equipment", "🖥️"),
+            "software": ("Software and subscriptions", "🛠️"),
+            "subscription": ("Software and subscriptions", "🛠️"),
+            "education": ("Education", "📚"),
+            "school": ("Education", "📚"),
+            "university": ("Education", "📚"),
+            "health": ("Health", "❤️‍🩹"),
+            "medical": ("Health", "❤️‍🩹"),
+            "pharmacy": ("Health", "❤️‍🩹"),
+            "sport": ("Sports", "💪"),
+            "gym": ("Sports", "💪"),
+            "fitness": ("Sports", "💪"),
+            "communication": ("Communication expenses", "☎️"),
+            "phone": ("Communication expenses", "☎️"),
+            "internet": ("Communication expenses", "☎️"),
+            "uniform": ("Uniform", "🥋"),
+            "clothing": ("Uniform", "🥋"),
+            "travel": ("Travel expenses", "🧳"),
+            "transport": ("Travel expenses", "🧳"),
+            "taxi": ("Travel expenses", "🧳"),
+            "uber": ("Travel expenses", "🧳"),
+            "client": ("Client-related expenses", "🤝"),
+            "business": ("Client-related expenses", "🤝"),
+            "meeting": ("Client-related expenses", "🤝")
+        ]
+        
+        // Check merchant name first
+        for (keyword, (category, emoji)) in categoryKeywords {
+            if merchantLower.contains(keyword) {
+                selectedCategory = Category(name: category, emoji: emoji)
+                return
+            }
+        }
+        
+        // Check full text for keywords
+        for (keyword, (category, emoji)) in categoryKeywords {
+            if textLower.contains(keyword) {
+                selectedCategory = Category(name: category, emoji: emoji)
+                return
+            }
+        }
+    }
+    
+    private func getFlagForCurrency(_ code: String) -> String {
+        let flagMap: [String: String] = [
+            "USD": "🇺🇸", "EUR": "🇪🇺", "GBP": "🇬🇧", "JPY": "🇯🇵",
+            "CAD": "🇨🇦", "AUD": "🇦🇺", "CHF": "🇨🇭", "SEK": "🇸🇪",
+            "INR": "🇮🇳", "RUB": "🇷🇺", "KRW": "🇰🇷", "ILS": "🇮🇱"
+        ]
+        return flagMap[code] ?? "🇺🇸"
     }
 
     private func firstMatch(in text: String, pattern: String) -> String? {
@@ -379,6 +586,16 @@ struct EditExpenseView: View {
             }
         } catch { }
         return nil
+    }
+    
+    private func matchesPattern(_ text: String, pattern: String) -> Bool {
+        do {
+            let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+            let range = NSRange(location: 0, length: text.utf16.count)
+            return regex.firstMatch(in: text, options: [], range: range) != nil
+        } catch {
+            return false
+        }
     }
 }
 

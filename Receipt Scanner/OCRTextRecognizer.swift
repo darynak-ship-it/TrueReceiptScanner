@@ -39,7 +39,9 @@ enum OCRTextRecognizer {
         // Configure for better accuracy
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["en_US"]
+        
+        // Support multiple languages for better international receipt recognition
+        request.recognitionLanguages = ["en_US", "de_DE", "fr_FR", "es_ES", "it_IT", "pt_PT", "nl_NL", "sv_SE", "da_DK", "no_NO", "fi_FI"]
         
         // iOS 18 compatibility improvements
         if #available(iOS 18.0, *) {
