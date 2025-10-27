@@ -219,13 +219,12 @@ struct EditExpenseView: View {
                             if tagsText.isEmpty {
                                 Text("#work, #meal, #projectX")
                                     .foregroundColor(.secondary)
+                                    .padding(.leading, 12)
                             }
                             TextField("", text: $tagsText)
                                 .padding(12)
-                                .background(themeManager.textFieldBackgroundColor)
                         }
-                        .padding(12)
-                        .background(themeManager.secondaryBackgroundColor)
+                        .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
                     }
 
@@ -238,16 +237,15 @@ struct EditExpenseView: View {
                                 Text("Add notes")
                                     .foregroundColor(.secondary)
                                     .padding(.top, 8)
-                                    .padding(.leading, 6)
+                                    .padding(.leading, 12)
                             }
                             TextEditor(text: $notes)
                                 .frame(minHeight: 120)
-                            .padding(8)
-                                .background(themeManager.textFieldBackgroundColor)
+                                .padding(4)
+                                .scrollContentBackground(.hidden)
                         }
-                        .padding(12)
-                        .background(themeManager.secondaryBackgroundColor)
-                            .cornerRadius(8)
+                        .background(themeManager.textFieldBackgroundColor)
+                        .cornerRadius(8)
                     }
 
                     // Save button
@@ -336,7 +334,7 @@ struct EditExpenseView: View {
     }
 
     private func saveExpense() {
-        // Parse amount
+        // Parse amount - allow 0 for empty entries
         let amount = Double(totalAmountText) ?? 0.0
         
         // Parse tags
@@ -356,18 +354,20 @@ struct EditExpenseView: View {
             thumbnailURL = nil
         } else {
             // Regular files need separate thumbnail
-        if let image = UIImage(contentsOfFile: imageURL.path) {
-            let thumbnailResult = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.3)
-            thumbnailURL = thumbnailResult.thumbnailURL
-        } else {
-            thumbnailURL = nil
+            // Don't fail if thumbnail creation fails - just proceed without it
+            if FileManager.default.fileExists(atPath: imageURL.path),
+               let image = UIImage(contentsOfFile: imageURL.path) {
+                let thumbnailResult = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.3)
+                thumbnailURL = thumbnailResult.thumbnailURL
+            } else {
+                thumbnailURL = nil
             }
         }
         
         // Create receipt directly in Core Data
         let receipt = Receipt(context: viewContext)
         receipt.id = UUID()
-        receipt.merchantName = merchantName.isEmpty ? "Unknown Merchant" : merchantName
+        receipt.merchantName = merchantName.isEmpty ? nil : merchantName
         receipt.amount = amount
         receipt.currency = selectedCurrency.code.isEmpty ? "USD" : selectedCurrency.code
         receipt.date = date
@@ -386,11 +386,11 @@ struct EditExpenseView: View {
         receipt.updatedAt = Date()
         
         // Set compression metadata
-        if imageURL.pathExtension.lowercased() == "zip" {
+        if finalImageURL.pathExtension.lowercased() == "zip" {
             receipt.compressionType = "zip"
             // Get file sizes for compression metadata
             do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: imageURL.path)
+                let attributes = try FileManager.default.attributesOfItem(atPath: finalImageURL.path)
                 receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
                 // Estimate original size (ZIP typically compresses to 60-70% of original)
                 receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
@@ -403,12 +403,18 @@ struct EditExpenseView: View {
             }
         } else {
             receipt.compressionType = "none"
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: imageURL.path)
-                receipt.originalFileSize = attributes[.size] as? Int64 ?? 0
-                receipt.compressedFileSize = receipt.originalFileSize
-                receipt.compressionRatio = 1.0
-            } catch {
+            if FileManager.default.fileExists(atPath: finalImageURL.path) {
+                do {
+                    let attributes = try FileManager.default.attributesOfItem(atPath: finalImageURL.path)
+                    receipt.originalFileSize = attributes[.size] as? Int64 ?? 0
+                    receipt.compressedFileSize = receipt.originalFileSize
+                    receipt.compressionRatio = 1.0
+                } catch {
+                    receipt.originalFileSize = 0
+                    receipt.compressedFileSize = 0
+                    receipt.compressionRatio = 1.0
+                }
+            } else {
                 receipt.originalFileSize = 0
                 receipt.compressedFileSize = 0
                 receipt.compressionRatio = 1.0

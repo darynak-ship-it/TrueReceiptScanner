@@ -456,7 +456,7 @@ class StorageManager: ObservableObject {
     // MARK: - Receipt Management
     
     func saveReceipt(
-        merchantName: String,
+        merchantName: String?,
         amount: Double,
         currency: String,
         date: Date,
@@ -474,12 +474,7 @@ class StorageManager: ObservableObject {
     ) -> Receipt? {
         let context = persistenceController.container.viewContext
         
-        // Validate required fields
-        guard !merchantName.isEmpty else {
-            print("Error: Merchant name cannot be empty")
-            return nil
-        }
-        
+        // Validate amount is not negative
         guard amount >= 0 else {
             print("Error: Amount cannot be negative")
             return nil

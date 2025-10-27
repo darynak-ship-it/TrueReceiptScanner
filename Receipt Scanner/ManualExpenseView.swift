@@ -60,6 +60,8 @@ struct ManualExpenseView: View {
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
     @State private var showImagePicker: Bool = false
+    @State private var showErrorAlert: Bool = false
+    @State private var errorMessage: String = ""
     
     // Currency and category options
     private let currencies: [Currency] = [
@@ -263,13 +265,12 @@ struct ManualExpenseView: View {
                             if tagsText.isEmpty {
                                 Text("#work, #meal, #projectX")
                                     .foregroundColor(.secondary)
+                                    .padding(.leading, 12)
                             }
                             TextField("", text: $tagsText)
                                 .padding(12)
-                                .background(themeManager.textFieldBackgroundColor)
                         }
-                        .padding(12)
-                        .background(themeManager.secondaryBackgroundColor)
+                        .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
                     }
                     
@@ -282,15 +283,14 @@ struct ManualExpenseView: View {
                                 Text("Add notes")
                                     .foregroundColor(.secondary)
                                     .padding(.top, 8)
-                                    .padding(.leading, 6)
+                                    .padding(.leading, 12)
                             }
                             TextEditor(text: $notes)
                                 .frame(minHeight: 120)
-                                .padding(8)
-                                .background(themeManager.textFieldBackgroundColor)
+                                .padding(4)
+                                .scrollContentBackground(.hidden)
                         }
-                        .padding(12)
-                        .background(themeManager.secondaryBackgroundColor)
+                        .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
                     }
                     
@@ -335,6 +335,11 @@ struct ManualExpenseView: View {
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }
+        }
+        .alert("Save Error", isPresented: $showErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
         }
         .fullScreenCover(isPresented: $showReceiptViewer) {
             if let image = attachedImage {
@@ -387,7 +392,7 @@ struct ManualExpenseView: View {
     }
     
     private func saveExpense() {
-        // Parse amount
+        // Parse amount - allow 0 for empty entries
         let amount = Double(totalAmountText) ?? 0.0
         
         // Parse tags
@@ -396,6 +401,7 @@ struct ManualExpenseView: View {
             .filter { !$0.isEmpty }
         
         // Save image and get URLs if image is attached
+        // Don't fail if image save fails - proceed without it
         let imageURLs: (imageURL: URL?, thumbnailURL: URL?)
         if let image = attachedImage {
             imageURLs = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.6)
@@ -405,7 +411,7 @@ struct ManualExpenseView: View {
         
         // Save receipt to Core Data
         let savedReceipt = StorageManager.shared.saveReceipt(
-            merchantName: merchantName,
+            merchantName: merchantName.isEmpty ? nil : merchantName,
             amount: amount,
             currency: selectedCurrency.code,
             date: date,
@@ -426,7 +432,9 @@ struct ManualExpenseView: View {
             showSavedAlert = true
             onSaved()
         } else {
-            // Handle save error
+            // Handle save error with user-friendly message
+            errorMessage = "Failed to save receipt. Please check your device storage and try again."
+            showErrorAlert = true
             print("Failed to save manual expense")
         }
     }
