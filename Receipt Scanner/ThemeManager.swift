@@ -51,7 +51,7 @@ class ThemeManager: ObservableObject {
         case "light":
             return Color(.secondarySystemBackground)
         case "dark":
-            return Color(.secondarySystemBackground)
+            return Color.gray.opacity(0.2)
         default:
             return Color(.secondarySystemBackground)
         }
