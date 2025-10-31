@@ -1,5 +1,5 @@
 //
-//  EditExpenseView.swift
+//  EditManualExpenseView.swift
 //  Receipt Scanner
 //
 //  Created by AI Assistant on 10/16/25.
@@ -29,20 +29,17 @@ private struct PaymentMethod: Identifiable, Equatable {
     let emoji: String
 }
 
-// MARK: - EditExpenseView
+// MARK: - EditManualExpenseView
 
-struct EditExpenseView: View {
-    let imageURL: URL
-    @State var recognizedText: String
-    let onScanAnother: () -> Void
+struct EditManualExpenseView: View {
+    let receipt: Receipt
     let onSaved: () -> Void
-    @State private var showReceiptViewer: Bool = false
-    @Environment(\.managedObjectContext) private var viewContext
+    let onCancel: () -> Void
     
     @AppStorage("defaultCurrency") private var defaultCurrency: String = "USD"
     @AppStorage("defaultCategory") private var defaultCategory: String = "Other"
     @StateObject private var themeManager = ThemeManager.shared
-
+    
     // Editable fields
     @State private var merchantName: String = ""
     @State private var date: Date = Date()
@@ -53,12 +50,18 @@ struct EditExpenseView: View {
     @State private var taxDeductible: Bool = false
     @State private var tagsText: String = ""
     @State private var notes: String = ""
-
+    
+    // Image attachment
+    @State private var attachedImage: UIImage? = nil
+    @State private var attachedImageURL: URL? = nil
+    @State private var showReceiptViewer: Bool = false
+    
     // Sheet toggles
     @State private var showCurrencySheet: Bool = false
     @State private var showCategorySheet: Bool = false
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
+    @State private var showImagePicker: Bool = false
     @State private var showErrorAlert: Bool = false
     @State private var errorMessage: String = ""
     
@@ -100,60 +103,89 @@ struct EditExpenseView: View {
         Category(name: "Client-related expenses", emoji: "🤝"),
         Category(name: "Other", emoji: "🗂️")
     ]
-
+    
     var body: some View {
-            ScrollView {
+        ScrollView {
             VStack(spacing: 16) {
-                // Small preview at the very top (tap to view full receipt)
-                Group {
-                    if let previewImage = loadImageFromURL(imageURL) {
+                // Image attachment section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Receipt Image (Optional)")
+                        .font(.headline)
+                    
+                    if let image = attachedImage {
                         Button(action: { showReceiptViewer = true }) {
                             HStack(spacing: 12) {
-                                Image(uiImage: previewImage)
+                                Image(uiImage: image)
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(height: 200)
+                                    .frame(height: 120)
                                     .frame(maxWidth: .infinity, alignment: .center)
                                     .cornerRadius(12)
-
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                    .foregroundColor(.secondary)
+                                
+                                VStack(spacing: 8) {
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        .foregroundColor(.secondary)
+                                    Text("Tap to view full size")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                             .padding(.horizontal, 16)
-                            .padding(.top, 12)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Receipt preview. Tap to view full size.")
-                    } else {
-                        // Fallback: Show placeholder if image can't be loaded
-                        VStack(spacing: 12) {
-                            Image(systemName: "doc.text.image")
-                                .font(.system(size: 60))
-                                .foregroundColor(.secondary)
-                            Text("Receipt image unavailable")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text("Image URL: \(imageURL.lastPathComponent)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        
+                        HStack {
+                            Button("Remove Image") {
+                                attachedImage = nil
+                                attachedImageURL = nil
+                            }
+                            .foregroundColor(.red)
+                            
+                            Spacer()
+                            
+                            Button("Replace Image") {
+                                showImagePicker = true
+                            }
+                            .foregroundColor(.accentColor)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        .font(.subheadline)
+                    } else {
+                        Button(action: { showImagePicker = true }) {
+                            VStack(spacing: 12) {
+                                Image(systemName: "photo.badge.plus")
+                                    .font(.title)
+                                    .foregroundColor(.accentColor)
+                                
+                                Text("Attach Receipt Image")
+                                    .font(.headline)
+                                    .foregroundColor(.accentColor)
+                                
+                                Text("Optional - helps with record keeping")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(12)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-
+                .padding(.horizontal, 16)
+                
                 // Single gray pad with all editable fields
                 VStack(alignment: .leading, spacing: 16) {
                     // Field 1 - Merchant Name (white rounded field with example)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Merchant Name")
                             .font(.headline)
-                        TextField("Item 1: Sample Item", text: $merchantName)
+                        TextField("Enter merchant name", text: $merchantName)
                             .padding(12)
                             .background(themeManager.textFieldBackgroundColor)
                             .cornerRadius(8)
                     }
-
+                    
                     // Field 2 - Date (label and date on one line)
                     HStack {
                         Text("Date")
@@ -163,13 +195,13 @@ struct EditExpenseView: View {
                             .datePickerStyle(.compact)
                             .labelsHidden()
                     }
-
+                    
                     // Field 3 - Total + Currency (white rounded field with example)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Total")
                             .font(.headline)
                         HStack(spacing: 12) {
-                            TextField("0.0", text: $totalAmountText)
+                            TextField("0.00", text: $totalAmountText)
                                 .keyboardType(.decimalPad)
                                 .padding(12)
                                 .background(themeManager.textFieldBackgroundColor)
@@ -187,7 +219,7 @@ struct EditExpenseView: View {
                             }
                         }
                     }
-
+                    
                     // Field 4 - Category (single-line label + preview)
                     HStack {
                         Text("Category")
@@ -202,7 +234,7 @@ struct EditExpenseView: View {
                             }
                         }
                     }
-
+                    
                     // Field 5 - Payment Method
                     HStack {
                         Text("Payment Method")
@@ -217,7 +249,7 @@ struct EditExpenseView: View {
                             }
                         }
                     }
-
+                    
                     // Field 6 - Tax Deductible toggle
                     HStack {
                         Text("Tax Deductible")
@@ -226,7 +258,7 @@ struct EditExpenseView: View {
                         Toggle("", isOn: $taxDeductible)
                             .labelsHidden()
                     }
-
+                    
                     // Field 7 - Tag (white rounded field with example)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tag")
@@ -243,7 +275,7 @@ struct EditExpenseView: View {
                         .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
                     }
-
+                    
                     // Field 8 - Notes (white rounded field with example)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes")
@@ -263,7 +295,7 @@ struct EditExpenseView: View {
                         .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
                     }
-
+                    
                     // Save button
                     Button(action: { saveExpense() }) {
                         Text("Save")
@@ -283,23 +315,16 @@ struct EditExpenseView: View {
                 .padding(.bottom, 24)
             }
         }
-            .navigationTitle("Edit Expense")
-            .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Edit Expense")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("Back", action: onScanAnother)
+                Button("Cancel", action: onCancel)
                     .foregroundColor(.accentColor)
             }
         }
-        .onAppear {
-            prefillFromOCR()
-            // Set default currency and category from settings
-            if let defaultCurrencyObj = currencies.first(where: { $0.code == defaultCurrency }) {
-                selectedCurrency = defaultCurrencyObj
-            }
-            if let defaultCategoryObj = categories.first(where: { $0.name == defaultCategory }) {
-                selectedCategory = defaultCategoryObj
-            }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(selectedImage: $attachedImage)
         }
         .sheet(isPresented: $showCurrencySheet) {
             CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
@@ -319,35 +344,114 @@ struct EditExpenseView: View {
             Text(errorMessage)
         }
         .fullScreenCover(isPresented: $showReceiptViewer) {
-            NavigationStack {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    if let img = loadImageFromURL(imageURL) {
+            if let image = attachedImage {
+                NavigationStack {
+                    ZStack {
+                        Color.black.ignoresSafeArea()
                         GeometryReader { geometry in
                             ScrollView([.vertical, .horizontal], showsIndicators: true) {
-                                Image(uiImage: img)
+                                Image(uiImage: image)
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: geometry.size.width)
                             }
                         }
-                    } else {
-                        Text("No receipt available")
-                            .foregroundColor(.white)
+                    }
+                    .navigationTitle("Receipt")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showReceiptViewer = false }
+                                .foregroundColor(.accentColor)
+                        }
                     }
                 }
-                .navigationTitle("Receipt")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") { showReceiptViewer = false }
-                            .foregroundColor(.accentColor)
+            }
+        }
+        .onAppear {
+            // Prefill fields from receipt
+            prefillFromReceipt()
+        }
+        .onChange(of: attachedImage) { newImage in
+            if let image = newImage {
+                // Save the image and perform OCR
+                if let url = FileStorage.save(image: image) {
+                    attachedImageURL = url
+                    // Perform OCR on the attached image
+                    OCRTextRecognizer.recognizeText(from: image) { recognizedText in
+                        DispatchQueue.main.async {
+                            prefillFromOCR(recognizedText ?? "")
+                        }
                     }
                 }
             }
         }
     }
-
+    
+    private func prefillFromReceipt() {
+        // Prefill merchant name
+        merchantName = receipt.merchantName ?? ""
+        
+        // Prefill date
+        date = receipt.date ?? Date()
+        
+        // Prefill amount
+        totalAmountText = String(format: "%.2f", receipt.amount)
+        
+        // Prefill currency
+        let currencyCode = receipt.currency ?? "USD"
+        if let currencyObj = currencies.first(where: { $0.code == currencyCode }) {
+            selectedCurrency = currencyObj
+        }
+        
+        // Prefill category
+        let categoryName = receipt.category ?? "Other"
+        let categoryEmoji = receipt.categoryEmoji ?? "🗂️"
+        if let categoryObj = categories.first(where: { $0.name == categoryName }) {
+            selectedCategory = categoryObj
+        } else {
+            selectedCategory = Category(name: categoryName, emoji: categoryEmoji)
+        }
+        
+        // Prefill payment method
+        let paymentName = receipt.paymentMethod ?? "Other"
+        let paymentEmoji = receipt.paymentEmoji ?? "❓"
+        let paymentMethods: [PaymentMethod] = [
+            PaymentMethod(name: "Credit Card", emoji: "💳"),
+            PaymentMethod(name: "Debit Card", emoji: "🤑"),
+            PaymentMethod(name: "PayPal", emoji: "🔹"),
+            PaymentMethod(name: "Apple Pay/Google Pay", emoji: "🤳"),
+            PaymentMethod(name: "Bank Transfer", emoji: "⏩"),
+            PaymentMethod(name: "Cash", emoji: "💸"),
+            PaymentMethod(name: "Prepaid Cards", emoji: "🎁"),
+            PaymentMethod(name: "Other", emoji: "❓")
+        ]
+        if let paymentObj = paymentMethods.first(where: { $0.name == paymentName }) {
+            selectedPayment = paymentObj
+        } else {
+            selectedPayment = PaymentMethod(name: paymentName, emoji: paymentEmoji)
+        }
+        
+        // Prefill tax deductible
+        taxDeductible = receipt.isTaxDeductible
+        
+        // Prefill tags
+        tagsText = receipt.tags ?? ""
+        
+        // Prefill notes
+        notes = receipt.notes ?? ""
+        
+        // Load existing image if available
+        if let imageURL = receipt.imageURL {
+            if imageURL.pathExtension.lowercased() == "zip" {
+                attachedImage = StorageManager.shared.loadImageFromZip(zipURL: imageURL)
+            } else {
+                attachedImage = UIImage(contentsOfFile: imageURL.path)
+            }
+            attachedImageURL = imageURL
+        }
+    }
+    
     private func saveExpense() {
         // Parse amount - allow 0 for empty entries
         let amount = Double(totalAmountText) ?? 0.0
@@ -357,335 +461,79 @@ struct EditExpenseView: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         
-        // Use the existing image URL from scanning - no need to save again
-        // The image was already saved during the scanning process in ScannerContainer
-        let finalImageURL = imageURL
+        // Save image and get URLs if image is attached/changed
+        var imageURL: URL? = receipt.imageURL
+        var thumbnailURL: URL? = receipt.thumbnailURL
         
-        // For ZIP files, we don't need a separate thumbnail as it's included in the ZIP
-        // For regular files, create thumbnail if needed
-        let thumbnailURL: URL?
-        if imageURL.pathExtension.lowercased() == "zip" {
-            // ZIP files contain both image and thumbnail
+        // If there's a new image, save it
+        if let image = attachedImage {
+            // Only save if it's a different image
+            if attachedImageURL != receipt.imageURL {
+                let imageURLs = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.6)
+                imageURL = imageURLs.imageURL
+                thumbnailURL = imageURLs.thumbnailURL
+            }
+        } else if attachedImage == nil && receipt.imageURL != nil {
+            // User removed the image
+            imageURL = nil
             thumbnailURL = nil
-        } else {
-            // Regular files need separate thumbnail
-            // Don't fail if thumbnail creation fails - just proceed without it
-            if FileManager.default.fileExists(atPath: imageURL.path),
-               let image = UIImage(contentsOfFile: imageURL.path) {
-                let thumbnailResult = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.3)
-                thumbnailURL = thumbnailResult.thumbnailURL
-            } else {
-                thumbnailURL = nil
-            }
         }
         
-        // Create receipt directly in Core Data
-        let receipt = Receipt(context: viewContext)
-        receipt.id = UUID()
-        receipt.merchantName = merchantName.isEmpty ? nil : merchantName
-        receipt.amount = amount
-        receipt.currency = selectedCurrency.code.isEmpty ? "USD" : selectedCurrency.code
-        receipt.date = date
-        receipt.category = selectedCategory.name.isEmpty ? "Other" : selectedCategory.name
-        receipt.categoryEmoji = selectedCategory.emoji.isEmpty ? "🗂️" : selectedCategory.emoji
-        receipt.paymentMethod = selectedPayment.name.isEmpty ? "Other" : selectedPayment.name
-        receipt.paymentEmoji = selectedPayment.emoji.isEmpty ? "❓" : selectedPayment.emoji
-        receipt.isTaxDeductible = taxDeductible
-        receipt.tags = tags.joined(separator: ",")
-        receipt.notes = notes
-        receipt.imageURL = finalImageURL
-        receipt.thumbnailURL = thumbnailURL
-        receipt.recognizedText = recognizedText
-        receipt.isManualEntry = false
-        receipt.createdAt = Date()
-        receipt.updatedAt = Date()
+        // Update receipt in Core Data
+        let success = StorageManager.shared.updateReceipt(
+            receipt: receipt,
+            merchantName: merchantName.isEmpty ? nil : merchantName,
+            amount: amount,
+            currency: selectedCurrency.code,
+            date: date,
+            category: selectedCategory.name,
+            categoryEmoji: selectedCategory.emoji,
+            paymentMethod: selectedPayment.name,
+            paymentEmoji: selectedPayment.emoji,
+            isTaxDeductible: taxDeductible,
+            tags: tags,
+            notes: notes,
+            imageURL: imageURL,
+            thumbnailURL: thumbnailURL
+        )
         
-        // Set compression metadata
-        if finalImageURL.pathExtension.lowercased() == "zip" {
-            receipt.compressionType = "zip"
-            // Get file sizes for compression metadata
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: finalImageURL.path)
-                receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
-                // Estimate original size (ZIP typically compresses to 60-70% of original)
-                receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
-                receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
-            } catch {
-                receipt.compressionType = "zip"
-                receipt.originalFileSize = 0
-                receipt.compressedFileSize = 0
-                receipt.compressionRatio = 0.0
-            }
-        } else {
-            receipt.compressionType = "none"
-            if FileManager.default.fileExists(atPath: finalImageURL.path) {
-                do {
-                    let attributes = try FileManager.default.attributesOfItem(atPath: finalImageURL.path)
-                    receipt.originalFileSize = attributes[.size] as? Int64 ?? 0
-                    receipt.compressedFileSize = receipt.originalFileSize
-                    receipt.compressionRatio = 1.0
-                } catch {
-                    receipt.originalFileSize = 0
-                    receipt.compressedFileSize = 0
-                    receipt.compressionRatio = 1.0
-                }
-            } else {
-                receipt.originalFileSize = 0
-                receipt.compressedFileSize = 0
-                receipt.compressionRatio = 1.0
-            }
-        }
-        
-        // Save to Core Data
-        do {
-            try viewContext.save()
-            print("Successfully saved receipt: \(receipt.merchantName ?? "Unknown") - $\(receipt.amount)")
+        if success {
             showSavedAlert = true
-            // Delay the onSaved callback to show the alert first
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                onSaved()
-            }
-        } catch {
-            // Handle save error - show user-friendly error
-            errorMessage = "Failed to save receipt. Please check your device storage and try again."
+            onSaved()
+        } else {
+            errorMessage = "Failed to update receipt. Please check your device storage and try again."
             showErrorAlert = true
-            print("Failed to save receipt to Core Data: \(error)")
-            // Rollback the context to prevent corruption
-            viewContext.rollback()
+            print("Failed to update manual expense")
         }
     }
-
-    // Enhanced OCR text parsing and prefill logic
-    private func prefillFromOCR() {
+    
+    private func prefillFromOCR(_ recognizedText: String) {
         let text = recognizedText
-        print("Prefilling from OCR text: \(text)")
         
-        // Extract merchant name
-        extractMerchantName(from: text)
-        
-        // Extract date
-        extractDate(from: text)
-        
-        // Extract amount and currency
-        extractAmountAndCurrency(from: text)
-        
-        // Extract category based on merchant name or keywords
-        extractCategory(from: text)
-        
-        print("Prefilled fields - Merchant: '\(merchantName)', Amount: '\(totalAmountText)', Currency: '\(selectedCurrency.code)', Date: \(date)")
-    }
-    
-    private func extractMerchantName(from text: String) {
-        if !merchantName.isEmpty { return }
-        
-        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
-        
-        // Try various patterns for merchant name
-        let merchantPatterns = [
-            // Explicit merchant/store labels
-            "(?:Store|Merchant|Company|Business|Restaurant|Hotel|Shop)[:\\s]+(.+)",
-            // Common receipt headers
-            "^([A-Za-z][A-Za-z0-9\\s&.-]+(?:Hotel|Restaurant|Cafe|Store|Shop|Market|Center|Mall|Plaza))",
-            // First substantial line (not receipt, total, date, etc.)
-            "^([A-Za-z][A-Za-z0-9\\s&.-]{3,})$"
-        ]
-        
-        for pattern in merchantPatterns {
-            if let merchant = firstMatch(in: text, pattern: pattern) {
-                // Filter out common non-merchant words
-                let filteredMerchant = merchant.trimmingCharacters(in: .whitespaces)
-                if !filteredMerchant.lowercased().contains("receipt") &&
-                   !filteredMerchant.lowercased().contains("total") &&
-                   !filteredMerchant.lowercased().contains("date") &&
-                   !filteredMerchant.lowercased().contains("time") &&
-                   filteredMerchant.count > 2 {
-                    merchantName = filteredMerchant
-                    return
-                }
+        // Only prefill if fields are empty
+        if merchantName.isEmpty {
+            if let m = firstMatch(in: text, pattern: "(?:Store|Merchant)[:\\t ]+(.+)") {
+                merchantName = m
+            } else if let firstLine = text.split(separator: "\n").first, !firstLine.lowercased().contains("receipt") {
+                merchantName = String(firstLine).trimmingCharacters(in: .whitespaces)
             }
         }
         
-        // Fallback: use first non-empty line that looks like a business name
-        for line in lines {
-            if line.count > 3 && 
-               !line.lowercased().contains("receipt") &&
-               !line.lowercased().contains("total") &&
-               !line.lowercased().contains("date") &&
-               !line.lowercased().contains("time") &&
-               !line.contains("$") &&
-               !line.contains("€") &&
-               !line.contains("£") &&
-               !matchesPattern(line, pattern: "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}") {
-                merchantName = line
-                return
-            }
-        }
-    }
-    
-    private func extractDate(from text: String) {
-        let datePatterns = [
-            // ISO format: 2024-10-16 or 2024/10/16
-            "(\\d{4}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01]))",
-            // US format: 10/16/2024 or 10-16-2024
-            "(?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01])[-/](\\d{4})",
-            // European format: 16/10/2024 or 16-10-2024
-            "(?:0?[1-9]|[12]\\d|3[01])[-/](?:0?[1-9]|1[0-2])[-/](\\d{4})",
-            // Month name format: Oct 16, 2024 or October 16, 2024
-            "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\\s+(?:0?[1-9]|[12]\\d|3[01]),?\\s+(\\d{4})"
-        ]
-        
-        for pattern in datePatterns {
-            if let dateStr = firstMatch(in: text, pattern: pattern) {
-                let formatters = [
-                    "yyyy-MM-dd",
-                    "yyyy/MM/dd", 
-                    "MM/dd/yyyy",
-                    "MM-dd-yyyy",
-                    "dd/MM/yyyy",
-                    "dd-MM-yyyy",
-                    "MMM d, yyyy",
-                    "MMMM d, yyyy"
-                ]
-                
-                for format in formatters {
+        if let dateStr = firstMatch(in: text, pattern: "(\\d{4}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01]))") {
             let formatter = DateFormatter()
-                    formatter.dateFormat = format
-                    if let parsedDate = formatter.date(from: dateStr) {
-                        date = parsedDate
-                        return
-                    }
-                }
+            formatter.dateFormat = "yyyy-MM-dd"
+            if let dt = formatter.date(from: dateStr.replacingOccurrences(of: "/", with: "-")) {
+                date = dt
+            }
+        }
+        
+        if totalAmountText.isEmpty {
+            if let tot = firstMatch(in: text, pattern: "Total[^\\n]*?([0-9]+(?:\\.[0-9]{1,2})?)") {
+                totalAmountText = tot
             }
         }
     }
     
-    private func extractAmountAndCurrency(from text: String) {
-        if !totalAmountText.isEmpty { return }
-        
-        // Currency symbols and their codes
-        let currencyMap: [String: String] = [
-            "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", 
-            "C$": "CAD", "A$": "AUD", "CHF": "CHF", "kr": "SEK",
-            "₹": "INR", "₽": "RUB", "₩": "KRW", "₪": "ILS"
-        ]
-        
-        // Amount patterns - look for various formats
-        let amountPatterns = [
-            // Total with currency symbol: $12.34, €45.67
-            "([$€£¥C$A$₹₽₩₪])\\s*([0-9]+(?:\\.[0-9]{1,2})?)",
-            // Total without currency: Total: 12.34, Amount: 45.67
-            "(?:Total|Amount|Sum|Subtotal|Grand Total)[:\\s]*([0-9]+(?:\\.[0-9]{1,2})?)",
-            // Just numbers that look like amounts: 12.34, 123.45
-            "\\b([0-9]+(?:\\.[0-9]{1,2})?)\\b"
-        ]
-        
-        var foundAmount: String?
-        var foundCurrency: String = "USD" // default
-        
-        for pattern in amountPatterns {
-            if let match = firstMatch(in: text, pattern: pattern) {
-                // Check if it contains currency symbol
-                for (symbol, code) in currencyMap {
-                    if match.contains(symbol) {
-                        foundCurrency = code
-                        // Extract just the number part
-                        if let amount = firstMatch(in: match, pattern: "([0-9]+(?:\\.[0-9]{1,2})?)") {
-                            foundAmount = amount
-                            break
-                        }
-                    }
-                }
-                
-                // If no currency symbol, check if it's a reasonable amount
-                if foundAmount == nil {
-                    let amount = match.trimmingCharacters(in: .whitespaces)
-                    if let value = Double(amount), value > 0 && value < 10000 {
-                        foundAmount = amount
-                    }
-                }
-            }
-            
-            if foundAmount != nil { break }
-        }
-        
-        if let amount = foundAmount {
-            totalAmountText = amount
-            // Update currency if we found one
-            if let currencyCode = currencyMap.values.first(where: { $0 == foundCurrency }) {
-                selectedCurrency = Currency(code: foundCurrency, flag: getFlagForCurrency(foundCurrency))
-            }
-        }
-    }
-    
-    private func extractCategory(from text: String) {
-        let merchantLower = merchantName.lowercased()
-        let textLower = text.lowercased()
-        
-        // Category mapping based on keywords
-        let categoryKeywords: [String: (String, String)] = [
-            "hotel": ("Accommodation", "🏨"),
-            "restaurant": ("Food & Dining", "🍽️"),
-            "cafe": ("Food & Dining", "🍽️"),
-            "coffee": ("Food & Dining", "🍽️"),
-            "food": ("Food & Dining", "🍽️"),
-            "dining": ("Food & Dining", "🍽️"),
-            "gas": ("Travel expenses", "🧳"),
-            "fuel": ("Travel expenses", "🧳"),
-            "station": ("Travel expenses", "🧳"),
-            "office": ("Office supplies", "📎"),
-            "supplies": ("Office supplies", "📎"),
-            "computer": ("Technology and equipment", "🖥️"),
-            "software": ("Software and subscriptions", "🛠️"),
-            "subscription": ("Software and subscriptions", "🛠️"),
-            "education": ("Education", "📚"),
-            "school": ("Education", "📚"),
-            "university": ("Education", "📚"),
-            "health": ("Health", "❤️‍🩹"),
-            "medical": ("Health", "❤️‍🩹"),
-            "pharmacy": ("Health", "❤️‍🩹"),
-            "sport": ("Sports", "💪"),
-            "gym": ("Sports", "💪"),
-            "fitness": ("Sports", "💪"),
-            "communication": ("Communication expenses", "☎️"),
-            "phone": ("Communication expenses", "☎️"),
-            "internet": ("Communication expenses", "☎️"),
-            "uniform": ("Uniform", "🥋"),
-            "clothing": ("Uniform", "🥋"),
-            "travel": ("Travel expenses", "🧳"),
-            "transport": ("Travel expenses", "🧳"),
-            "taxi": ("Travel expenses", "🧳"),
-            "uber": ("Travel expenses", "🧳"),
-            "client": ("Client-related expenses", "🤝"),
-            "business": ("Client-related expenses", "🤝"),
-            "meeting": ("Client-related expenses", "🤝")
-        ]
-        
-        // Check merchant name first
-        for (keyword, (category, emoji)) in categoryKeywords {
-            if merchantLower.contains(keyword) {
-                selectedCategory = Category(name: category, emoji: emoji)
-                return
-            }
-        }
-        
-        // Check full text for keywords
-        for (keyword, (category, emoji)) in categoryKeywords {
-            if textLower.contains(keyword) {
-                selectedCategory = Category(name: category, emoji: emoji)
-                return
-            }
-        }
-    }
-    
-    private func getFlagForCurrency(_ code: String) -> String {
-        let flagMap: [String: String] = [
-            "USD": "🇺🇸", "EUR": "🇪🇺", "GBP": "🇬🇧", "JPY": "🇯🇵",
-            "CAD": "🇨🇦", "AUD": "🇦🇺", "CHF": "🇨🇭", "SEK": "🇸🇪",
-            "INR": "🇮🇳", "RUB": "🇷🇺", "KRW": "🇰🇷", "ILS": "🇮🇱"
-        ]
-        return flagMap[code] ?? "🇺🇸"
-    }
-
     private func firstMatch(in text: String, pattern: String) -> String? {
         do {
             let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
@@ -697,53 +545,9 @@ struct EditExpenseView: View {
         } catch { }
         return nil
     }
-    
-    private func matchesPattern(_ text: String, pattern: String) -> Bool {
-        do {
-            let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-            let range = NSRange(location: 0, length: text.utf16.count)
-            return regex.firstMatch(in: text, options: [], range: range) != nil
-        } catch {
-            return false
-        }
-    }
-    
-    /// Loads image from URL, handling both regular files and ZIP archives
-    private func loadImageFromURL(_ url: URL) -> UIImage? {
-        print("Loading image from URL: \(url.path)")
-        print("File exists: \(FileManager.default.fileExists(atPath: url.path))")
-        
-        // Check if it's a ZIP file
-        if url.pathExtension.lowercased() == "zip" {
-            print("Attempting to load from ZIP file...")
-            if let zipImage = StorageManager.shared.loadImageFromZip(zipURL: url) {
-                print("Successfully loaded image from ZIP: \(zipImage.size)")
-                return zipImage
-            } else {
-                print("Failed to load from ZIP, trying direct file access...")
-                // Fallback: try to load as regular image file
-                if let directImage = UIImage(contentsOfFile: url.path) {
-                    print("Successfully loaded image directly: \(directImage.size)")
-                    return directImage
-                }
-            }
-        } else {
-            // Regular file
-            print("Loading regular image file...")
-            if let image = UIImage(contentsOfFile: url.path) {
-                print("Successfully loaded regular image: \(image.size)")
-                return image
-            } else {
-                print("Failed to load regular image file")
-            }
-        }
-        
-        print("ERROR: Could not load image from URL: \(url.path)")
-        return nil
-    }
 }
 
-// MARK: - Currency Picker
+// MARK: - Currency Picker (reusing from ManualExpenseView)
 
 private struct CurrencyPickerView: View {
     @Binding var selected: Currency
@@ -798,7 +602,7 @@ private struct CurrencyPickerView: View {
     }
 }
 
-// MARK: - Category Picker
+// MARK: - Category Picker (reusing from ManualExpenseView)
 
 private struct CategoryPickerView: View {
     @Binding var selected: Category
@@ -902,7 +706,7 @@ private struct CategoryPickerView: View {
     }
 }
 
-// MARK: - Payment Picker
+// MARK: - Payment Picker (reusing from ManualExpenseView)
 
 private struct PaymentPickerView: View {
     @Binding var selected: PaymentMethod
@@ -950,14 +754,25 @@ private struct PaymentPickerView: View {
 }
 
 #Preview {
-    NavigationStack {
-        EditExpenseView(
-            imageURL: URL(fileURLWithPath: "/dev/null"),
-            recognizedText: "Sample Receipt\nStore: Demo Market\nDate: 2025-10-16\nTotal: $11.64",
-            onScanAnother: {},
-            onSaved: {}
+    let context = PersistenceController.preview.container.viewContext
+    let receipt = Receipt(context: context)
+    receipt.id = UUID()
+    receipt.merchantName = "Sample Store"
+    receipt.amount = 25.99
+    receipt.currency = "USD"
+    receipt.date = Date()
+    receipt.category = "Office supplies"
+    receipt.categoryEmoji = "📎"
+    receipt.paymentMethod = "Credit Card"
+    receipt.paymentEmoji = "💳"
+    receipt.isTaxDeductible = true
+    
+    return NavigationStack {
+        EditManualExpenseView(
+            receipt: receipt,
+            onSaved: {},
+            onCancel: {}
         )
     }
 }
-
 

@@ -42,23 +42,43 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            // Dismiss the picker
             picker.dismiss(animated: true)
             
-            guard let provider = results.first?.itemProvider else { 
-                parent.onImageSelected?(nil)
-                return 
+            // Check if user cancelled (no selection)
+            guard !results.isEmpty, let provider = results.first?.itemProvider else {
+                DispatchQueue.main.async {
+                    self.parent.onImageSelected?(nil)
+                }
+                return
             }
             
+            // Load the image
             if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, _ in
+                provider.loadObject(ofClass: UIImage.self) { image, error in
                     DispatchQueue.main.async {
-                        let selectedImage = image as? UIImage
+                        if let error = error {
+                            print("Error loading image: \(error.localizedDescription)")
+                            self.parent.onImageSelected?(nil)
+                            return
+                        }
+                        
+                        guard let selectedImage = image as? UIImage else {
+                            print("Failed to cast image to UIImage")
+                            self.parent.onImageSelected?(nil)
+                            return
+                        }
+                        
+                        print("Successfully loaded image from gallery: \(selectedImage.size)")
                         self.parent.selectedImage = selectedImage
                         self.parent.onImageSelected?(selectedImage)
                     }
                 }
             } else {
-                parent.onImageSelected?(nil)
+                DispatchQueue.main.async {
+                    print("Provider cannot load UIImage")
+                    self.parent.onImageSelected?(nil)
+                }
             }
         }
     }

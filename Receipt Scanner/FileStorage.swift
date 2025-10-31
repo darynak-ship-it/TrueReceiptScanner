@@ -400,11 +400,23 @@ class StorageManager: ObservableObject {
     /// Loads image from ZIP archive
     func loadImageFromZip(zipURL: URL) -> UIImage? {
         do {
+            print("Loading ZIP file from: \(zipURL.path)")
             let zipData = try Data(contentsOf: zipURL)
+            print("ZIP data loaded, size: \(zipData.count) bytes")
+            
+            // Try to extract image
             let imageData = try extractImageFromZip(zipData: zipData)
-            return UIImage(data: imageData)
+            print("Image data extracted, size: \(imageData.count) bytes")
+            
+            guard let image = UIImage(data: imageData) else {
+                print("Failed to create UIImage from extracted data")
+                return nil
+            }
+            
+            print("Successfully created UIImage from ZIP: \(image.size)")
+            return image
         } catch {
-            print("Failed to load image from ZIP: \(error)")
+            print("Failed to load image from ZIP: \(error.localizedDescription)")
             return nil
         }
     }
@@ -423,21 +435,104 @@ class StorageManager: ObservableObject {
     
     /// Extracts image data from ZIP archive
     private func extractImageFromZip(zipData: Data) throws -> Data {
-        // Simplified ZIP extraction - in production, you'd want a proper ZIP library
-        // For now, we'll use a basic approach that works with our simple ZIP format
-        
-        // Find the image.jpg entry in the ZIP
+        // Parse ZIP structure to find and extract image.jpg
         let imageSignature = "image.jpg"
-        guard let imageStart = zipData.range(of: imageSignature.data(using: .utf8)!) else {
+        guard let imageStartRange = zipData.range(of: imageSignature.data(using: .utf8)!) else {
+            print("Could not find 'image.jpg' signature in ZIP data")
             throw CompressionError.fileNotFound
         }
         
-        // This is a simplified extraction - proper implementation would parse ZIP headers
-        // For demonstration, we'll assume the image data follows the filename
-        let dataStart = imageStart.upperBound
-        let imageData = zipData.subdata(in: dataStart..<zipData.count)
+        // Find the start of the local file header for this entry
+        // Look backwards for the ZIP local file header signature (PK\x03\x04)
+        let zipHeader: [UInt8] = [0x50, 0x4B, 0x03, 0x04] // "PK.."
+        let zipHeaderData = Data(zipHeader)
         
-        return imageData
+        // Search backwards from filename to find the header
+        let filenameStartOffset = zipData.distance(from: zipData.startIndex, to: imageStartRange.lowerBound)
+        let maxSearchBack = min(300, filenameStartOffset) // Local file header is typically within 300 bytes
+        
+        var headerOffset = 0
+        
+        if maxSearchBack > 0 {
+            let searchStart = filenameStartOffset - maxSearchBack
+            let searchRange = zipData.subdata(in: searchStart..<filenameStartOffset)
+            if let headerRange = searchRange.range(of: zipHeaderData, options: .backwards) {
+                let relativeOffset = searchRange.distance(from: searchRange.startIndex, to: headerRange.lowerBound)
+                headerOffset = searchStart + relativeOffset
+            } else {
+                // If we can't find header, assume it's right before filename (simplified ZIP format)
+                headerOffset = max(0, filenameStartOffset - 100)
+            }
+        }
+        
+        // Local file header structure (offset from header start):
+        // 0-3: Signature (already found)
+        // 4-5: Version (2 bytes)
+        // 6-7: General purpose bit flag (2 bytes)
+        // 8-9: Compression method (2 bytes)
+        // 10-11: Last mod time (2 bytes)
+        // 12-13: Last mod date (2 bytes)
+        // 14-17: CRC-32 (4 bytes)
+        // 18-21: Compressed size (4 bytes, little-endian)
+        // 22-25: Uncompressed size (4 bytes, little-endian)
+        // 26-27: File name length (2 bytes, little-endian)
+        // 28-29: Extra field length (2 bytes, little-endian)
+        // 30+: File name + Extra field + Compressed data
+        
+        // Read values from ZIP header using byte array access
+        guard headerOffset + 30 <= zipData.count else {
+            throw CompressionError.invalidZipFormat
+        }
+        
+        let headerBytes = zipData.subdata(in: headerOffset..<min(headerOffset + 100, zipData.count))
+        let bytes = [UInt8](headerBytes)
+        
+        guard bytes.count >= 30 else {
+            throw CompressionError.invalidZipFormat
+        }
+        
+        // Read compressed size (offset 18-21, little-endian)
+        let compressedSize = UInt32(bytes[18]) |
+                             (UInt32(bytes[19]) << 8) |
+                             (UInt32(bytes[20]) << 16) |
+                             (UInt32(bytes[21]) << 24)
+        
+        // Read uncompressed size (offset 22-25, little-endian)
+        let uncompressedSize = UInt32(bytes[22]) |
+                               (UInt32(bytes[23]) << 8) |
+                               (UInt32(bytes[24]) << 16) |
+                               (UInt32(bytes[25]) << 24)
+        
+        // Read filename length (offset 26-27, little-endian)
+        let filenameLength = UInt16(bytes[26]) | (UInt16(bytes[27]) << 8)
+        
+        // Read extra field length (offset 28-29, little-endian)
+        let extraFieldLength = UInt16(bytes[28]) | (UInt16(bytes[29]) << 8)
+        
+        // Calculate where compressed data starts (after header + filename + extra field)
+        let dataStartOffset = headerOffset + 30 + Int(filenameLength) + Int(extraFieldLength)
+        let dataEndOffset = dataStartOffset + Int(compressedSize)
+        
+        guard dataEndOffset <= zipData.count else {
+            throw CompressionError.invalidZipFormat
+        }
+        
+        // Extract compressed data
+        let compressedData = zipData.subdata(in: dataStartOffset..<dataEndOffset)
+        print("Found compressed image data: \(compressedData.count) bytes (uncompressed: \(uncompressedSize) bytes)")
+        
+        // Decompress the data
+        let decompressedData = try decompressData(compressedData, originalSize: Int(uncompressedSize))
+        print("Decompressed image data: \(decompressedData.count) bytes")
+        
+        // Verify it's a valid JPEG
+        let jpegMagic: [UInt8] = [0xFF, 0xD8, 0xFF]
+        if !decompressedData.prefix(3).elementsEqual(jpegMagic) {
+            print("Warning: Decompressed data doesn't start with JPEG magic bytes")
+            // Still return it, as it might be valid
+        }
+        
+        return decompressedData
     }
     
     /// Extracts thumbnail data from ZIP archive
@@ -547,6 +642,94 @@ class StorageManager: ObservableObject {
             // Rollback the context to prevent corruption
             context.rollback()
             return nil
+        }
+    }
+    
+    func updateReceipt(
+        receipt: Receipt,
+        merchantName: String?,
+        amount: Double,
+        currency: String,
+        date: Date,
+        category: String,
+        categoryEmoji: String,
+        paymentMethod: String,
+        paymentEmoji: String,
+        isTaxDeductible: Bool,
+        tags: [String],
+        notes: String,
+        imageURL: URL?,
+        thumbnailURL: URL?
+    ) -> Bool {
+        let context = persistenceController.container.viewContext
+        
+        // Validate amount is not negative
+        guard amount >= 0 else {
+            print("Error: Amount cannot be negative")
+            return false
+        }
+        
+        // Update receipt properties
+        receipt.merchantName = merchantName
+        receipt.amount = amount
+        receipt.currency = currency.isEmpty ? "USD" : currency
+        receipt.date = date
+        receipt.category = category.isEmpty ? "Other" : category
+        receipt.categoryEmoji = categoryEmoji.isEmpty ? "🗂️" : categoryEmoji
+        receipt.paymentMethod = paymentMethod.isEmpty ? "Other" : paymentMethod
+        receipt.paymentEmoji = paymentEmoji.isEmpty ? "❓" : paymentEmoji
+        receipt.isTaxDeductible = isTaxDeductible
+        receipt.tags = tags.joined(separator: ",")
+        receipt.notes = notes
+        receipt.updatedAt = Date()
+        
+        // Only update image URLs if new ones are provided
+        if let imageURL = imageURL {
+            receipt.imageURL = imageURL
+        }
+        if let thumbnailURL = thumbnailURL {
+            receipt.thumbnailURL = thumbnailURL
+        }
+        
+        // Update compression metadata if image URL changed
+        if let imageURL = imageURL {
+            if imageURL.pathExtension.lowercased() == "zip" {
+                receipt.compressionType = "zip"
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: imageURL.path)
+                    receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
+                    receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
+                    receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
+                } catch {
+                    receipt.compressionType = "zip"
+                    receipt.originalFileSize = 0
+                    receipt.compressedFileSize = 0
+                    receipt.compressionRatio = 0.0
+                }
+            } else {
+                receipt.compressionType = "none"
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: imageURL.path)
+                    receipt.originalFileSize = attributes[.size] as? Int64 ?? 0
+                    receipt.compressedFileSize = receipt.originalFileSize
+                    receipt.compressionRatio = 1.0
+                } catch {
+                    receipt.originalFileSize = 0
+                    receipt.compressedFileSize = 0
+                    receipt.compressionRatio = 1.0
+                }
+            }
+        }
+        
+        do {
+            try context.save()
+            refreshReceipts()
+            print("Successfully updated receipt: \(merchantName ?? "Unknown") - $\(amount)")
+            return true
+        } catch {
+            print("Failed to update receipt: \(error)")
+            context.rollback()
+            return false
         }
     }
     

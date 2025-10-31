@@ -11,9 +11,11 @@ import CoreData
 struct ReceiptsListView: View {
     @StateObject private var storageManager = StorageManager.shared
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var selectedFilter: ReceiptFilter = .all
     @State private var sortOption: ReceiptSortOption = .dateDesc
+    @State private var selectedReceiptForEdit: Receipt? = nil
     
     
     var body: some View {
@@ -68,17 +70,51 @@ struct ReceiptsListView: View {
                 EmptyStateView()
             } else {
                 List(filteredReceipts) { receipt in
-                    ReceiptRowView(receipt: receipt)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    ReceiptRowView(receipt: receipt) {
+                        selectedReceiptForEdit = receipt
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            storageManager.deleteReceipt(receipt)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
                 .listStyle(.plain)
             }
         }
         .navigationTitle("Receipts")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") { dismiss() }
+                    .foregroundColor(.accentColor)
+            }
+        }
         .onAppear {
             // Refresh data when view appears
             storageManager.refreshReceipts()
+        }
+        .sheet(isPresented: Binding(
+            get: { selectedReceiptForEdit != nil },
+            set: { if !$0 { selectedReceiptForEdit = nil } }
+        )) {
+            if let receipt = selectedReceiptForEdit {
+                NavigationStack {
+                    EditManualExpenseView(
+                        receipt: receipt,
+                        onSaved: {
+                            selectedReceiptForEdit = nil
+                            storageManager.refreshReceipts()
+                        },
+                        onCancel: {
+                            selectedReceiptForEdit = nil
+                        }
+                    )
+                }
+            }
         }
     }
     
@@ -151,6 +187,7 @@ struct FilterChip: View {
 
 struct ReceiptRowView: View {
     let receipt: Receipt
+    let onEdit: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -237,6 +274,14 @@ struct ReceiptRowView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            
+            // Edit button (pencil icon)
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .foregroundColor(.accentColor)
+                    .font(.system(size: 18))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
     }

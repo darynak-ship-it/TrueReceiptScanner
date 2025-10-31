@@ -23,8 +23,12 @@ struct RootView: View {
     @State private var showManualExpense: Bool = false
     @State private var showCreateReport: Bool = false
     @State private var showReceiptsList: Bool = false
+    @State private var showReportsList: Bool = false
     @State private var showSettings: Bool = false
     @State private var showSupport: Bool = false
+    @State private var isProcessingOCR: Bool = false
+    @State private var showImageCrop: Bool = false
+    @State private var selectedImageForCrop: UIImage? = nil
 
     var body: some View {
         Group {
@@ -67,7 +71,7 @@ struct RootView: View {
                         onOpenSettings: { showSettings = true },
                         onOpenHelp: { showSupport = true },
                         onOpenReceipts: { showReceiptsList = true },
-                        onOpenReports: {},
+                        onOpenReports: { showReportsList = true },
                         onScanReceipt: { requestCameraPermissionAndScan() },
                         onPickFromGallery: { showImagePicker = true },
                         onManualExpense: { showManualExpense = true },
@@ -97,17 +101,46 @@ struct RootView: View {
                 }
             }
         }
-        .sheet(isPresented: $showImagePicker) {
+        .sheet(isPresented: $showImagePicker, onDismiss: {
+            // Handle case where picker is dismissed without selection
+            print("Image picker dismissed")
+        }) {
             ImagePicker(selectedImage: .constant(nil), onImageSelected: { selectedImage in
+                // Only dismiss if we have an image or explicitly cancelled
                 showImagePicker = false
-                if let image = selectedImage {
-                    // Save image and perform OCR
-                    if let url = FileStorage.save(image: image) {
-                        self.scannedImageURL = url
-                        self.recognizedText = OCRTextRecognizer.recognizeTextSync(from: image) ?? ""
-                    }
+                
+                guard let image = selectedImage else {
+                    print("No image selected from gallery")
+                    return
                 }
+                
+                print("Image selected from gallery: \(image.size)")
+                // Show crop view instead of processing immediately
+                selectedImageForCrop = image
+                showImageCrop = true
             })
+        }
+        .sheet(isPresented: $showImageCrop) {
+            if let image = selectedImageForCrop {
+                ImageCropView(
+                    image: image,
+                    onCrop: { croppedImage in
+                        showImageCrop = false
+                        selectedImageForCrop = nil
+                        print("Processing cropped image from gallery: \(croppedImage.size)")
+                        processImageFromGallery(croppedImage)
+                    },
+                    onCancel: {
+                        showImageCrop = false
+                        selectedImageForCrop = nil
+                    }
+                )
+            }
+        }
+        .overlay {
+            if isProcessingOCR {
+                OCRProcessingOverlay()
+            }
         }
         .sheet(isPresented: $showManualExpense) {
             NavigationStack {
@@ -133,6 +166,11 @@ struct RootView: View {
         .sheet(isPresented: $showReceiptsList) {
             NavigationStack {
                 ReceiptsListView()
+            }
+        }
+        .sheet(isPresented: $showReportsList) {
+            NavigationStack {
+                ReportsListView()
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -189,11 +227,168 @@ struct RootView: View {
         }
     }
 
+    private func processImageFromGallery(_ image: UIImage) {
+        print("=== Processing image from gallery ===")
+        print("Image size: \(image.size)")
+        print("Image scale: \(image.scale)")
+        
+        // Show loading indicator
+        isProcessingOCR = true
+        
+        // Process image on background queue (similar to scanner)
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            // Apply scanner-like processing first (with timeout fallback)
+            print("Applying scanner processing...")
+            var processingCompleted = false
+            
+            // Set a timeout to ensure we don't wait forever
+            let timeoutWorkItem = DispatchWorkItem {
+                if !processingCompleted {
+                    print("Scanner processing timeout, using original image")
+                    processingCompleted = true
+                    self.saveAndProcessImage(image)
+                }
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 10.0, execute: timeoutWorkItem)
+            
+            ImageProcessor.processScannedImage(from: image) { processedImage in
+                guard !processingCompleted else { return }
+                processingCompleted = true
+                timeoutWorkItem.cancel()
+                
+                // Ensure we're on background queue for file operations
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let imageToSave = processedImage ?? image
+                    if processedImage == nil {
+                        print("Scanner processing failed, using original image")
+                    } else {
+                        print("Scanner processing completed successfully")
+                    }
+                    self.saveAndProcessImage(imageToSave)
+                }
+            }
+        }
+    }
+    
+    private func saveAndProcessImage(_ image: UIImage) {
+        // Save image using ZIP compression (like scanner)
+        print("Saving image as ZIP...")
+        let result = StorageManager.shared.saveReceiptImageAsZip(image, compressionQuality: 0.7)
+        var finalURL: URL? = result.zipURL
+        
+        if let zipURL = result.zipURL {
+            print("ZIP saved successfully: \(zipURL.path)")
+            // Verify file exists
+            if FileManager.default.fileExists(atPath: zipURL.path) {
+                print("ZIP file verified at path")
+            } else {
+                print("WARNING: ZIP file does not exist at path!")
+            }
+        } else {
+            print("ZIP save failed, falling back to regular JPEG...")
+        }
+        
+        // Fallback to regular save if ZIP fails
+        if finalURL == nil {
+            print("Using fallback JPEG save...")
+            let timestamp = Int(Date().timeIntervalSince1970)
+            let uuid = UUID().uuidString.prefix(8)
+            let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let jpgURL = documentsDir.appendingPathComponent("receipt_\(timestamp)_\(uuid).jpg")
+            
+            if let data = image.jpegData(compressionQuality: 0.7) {
+                do {
+                    try data.write(to: jpgURL, options: [.atomic])
+                    finalURL = jpgURL
+                    print("Fallback JPEG saved: \(jpgURL.path)")
+                    
+                    // Verify file exists
+                    if FileManager.default.fileExists(atPath: jpgURL.path) {
+                        print("JPEG file verified at path")
+                    } else {
+                        print("WARNING: JPEG file does not exist at path!")
+                    }
+                } catch {
+                    print("Failed to save JPEG: \(error)")
+                }
+            } else {
+                print("Failed to generate JPEG data")
+            }
+        }
+        
+        guard let url = finalURL else {
+            print("ERROR: Failed to save image - no URL available")
+            DispatchQueue.main.async {
+                self.isProcessingOCR = false
+            }
+            return
+        }
+        
+        print("Final image URL: \(url.path)")
+        let fileExists = FileManager.default.fileExists(atPath: url.path)
+        print("File exists: \(fileExists)")
+        
+        // Verify the file was actually saved
+        guard fileExists else {
+            print("ERROR: File does not exist after save attempt")
+            DispatchQueue.main.async {
+                self.isProcessingOCR = false
+            }
+            return
+        }
+        
+        // Perform OCR asynchronously
+        print("Starting OCR for gallery image...")
+        OCRTextRecognizer.recognizeText(from: image) { text in
+            print("OCR completed for gallery image")
+            DispatchQueue.main.async {
+                print("Setting scannedImageURL to: \(url.path)")
+                print("Image size: \(image.size)")
+                self.scannedImageURL = url
+                self.recognizedText = text ?? ""
+                self.isProcessingOCR = false
+                print("=== Gallery image processing complete ===")
+                print("scannedImageURL is now: \(String(describing: self.scannedImageURL?.path))")
+            }
+        }
+    }
+
     private func generateSample() {
         guard let image = SampleReceiptGenerator.generate() else { return }
-        if let url = FileStorage.save(image: image) {
-            self.scannedImageURL = url
-            self.recognizedText = OCRTextRecognizer.recognizeTextSync(from: image) ?? ""
+        processImageFromGallery(image)
+    }
+}
+
+struct OCRProcessingOverlay: View {
+    @StateObject private var themeManager = ThemeManager.shared
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 24) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                    .scaleEffect(1.5)
+                
+                VStack(spacing: 8) {
+                    Text("Scanning Receipt...")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text("Extracting text from image")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(40)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(UIColor.secondarySystemBackground))
+            )
+            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+            .padding(.horizontal, 40)
         }
     }
 }

@@ -17,6 +17,7 @@ struct CreateReportView: View {
     @State private var isGenerating = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var showPreview = false
     
     enum ReportFormat: String, CaseIterable {
         case pdf = "PDF"
@@ -117,25 +118,43 @@ struct CreateReportView: View {
                 
                 Spacer()
                 
-                // Generate Button
-                Button(action: generateReport) {
-                    HStack {
-                        if isGenerating {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
+                // Action Buttons
+                VStack(spacing: 12) {
+                    // Preview Button
+                    Button(action: { showPreview = true }) {
+                        HStack {
+                            Image(systemName: "eye")
+                            Text("Preview Report")
+                                .font(.headline)
                         }
-                        
-                        Text(isGenerating ? "Generating..." : "Generate Report")
-                            .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(selectedReceipts.isEmpty ? Color.gray : Color(UIColor.secondarySystemBackground))
+                        .foregroundColor(selectedReceipts.isEmpty ? .white : .accentColor)
+                        .cornerRadius(12)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(selectedReceipts.isEmpty ? Color.gray : Color.accentColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .disabled(selectedReceipts.isEmpty)
+                    
+                    // Generate Button
+                    Button(action: generateReport) {
+                        HStack {
+                            if isGenerating {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            }
+                            
+                            Text(isGenerating ? "Generating..." : "Generate Report")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(selectedReceipts.isEmpty ? Color.gray : Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(selectedReceipts.isEmpty || isGenerating)
                 }
-                .disabled(selectedReceipts.isEmpty || isGenerating)
                 .padding(.horizontal)
                 .padding(.bottom, 20)
             }
@@ -155,7 +174,34 @@ struct CreateReportView: View {
             } message: {
                 Text(alertMessage)
             }
+            .navigationDestination(isPresented: $showPreview) {
+                if !selectedReceiptsList.isEmpty {
+                    ReportPreviewView(
+                        receipts: selectedReceiptsList,
+                        reportNumber: generateReportNumber(),
+                        onBack: { showPreview = false },
+                        onGenerate: {
+                            showPreview = false
+                            generateReport()
+                        }
+                    )
+                }
+            }
         }
+    }
+    
+    private var selectedReceiptsList: [Receipt] {
+        allReceipts.filter { receipt in
+            guard let id = receipt.id else { return false }
+            return selectedReceipts.contains(id)
+        }
+    }
+    
+    private func generateReportNumber() -> String {
+        // Generate report number based on total reports count
+        let totalReports = StorageManager.shared.fetchReports().count
+        let reportNumber = String(format: "%03d", totalReports + 1)
+        return "№\(reportNumber)"
     }
     
     private var allReceipts: [Receipt] {
@@ -180,11 +226,6 @@ struct CreateReportView: View {
     
     private func generateReport() {
         isGenerating = true
-        
-        let selectedReceiptsList = allReceipts.filter { receipt in
-            guard let id = receipt.id else { return false }
-            return selectedReceipts.contains(id)
-        }
         
         DispatchQueue.global(qos: .userInitiated).async {
             var reportURL: URL?
