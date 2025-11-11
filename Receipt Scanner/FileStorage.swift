@@ -580,7 +580,7 @@ class StorageManager: ObservableObject {
         receipt.merchantName = merchantName
         receipt.amount = amount
         receipt.currency = currency.isEmpty ? "USD" : currency
-        receipt.date = date
+        receipt.date = date // Ensure date is set (required field)
         receipt.category = category.isEmpty ? "Other" : category
         receipt.categoryEmoji = categoryEmoji.isEmpty ? "🗂️" : categoryEmoji
         receipt.paymentMethod = paymentMethod.isEmpty ? "Other" : paymentMethod
@@ -595,6 +595,19 @@ class StorageManager: ObservableObject {
         receipt.createdAt = Date()
         receipt.updatedAt = Date()
         
+        // Validate required fields before saving
+        guard receipt.id != nil else {
+            print("Error: Receipt ID is nil")
+            context.rollback()
+            return nil
+        }
+        
+        guard receipt.date != nil else {
+            print("Error: Receipt date is nil")
+            context.rollback()
+            return nil
+        }
+        
         // Set compression metadata
         if let imageURL = imageURL {
             if imageURL.pathExtension.lowercased() == "zip" {
@@ -604,8 +617,13 @@ class StorageManager: ObservableObject {
                     let attributes = try fileManager.attributesOfItem(atPath: imageURL.path)
                     receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
                     // Estimate original size (ZIP typically compresses to 60-70% of original)
-                    receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
-                    receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
+                    if receipt.compressedFileSize > 0 {
+                        receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
+                        receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
+                    } else {
+                        receipt.originalFileSize = 0
+                        receipt.compressionRatio = 0.0
+                    }
                 } catch {
                     receipt.compressionType = "zip"
                     receipt.originalFileSize = 0
@@ -638,7 +656,20 @@ class StorageManager: ObservableObject {
             print("Successfully saved receipt: \(merchantName) - $\(amount)")
             return receipt
         } catch {
+            let nsError = error as NSError
             print("Failed to save receipt: \(error)")
+            print("Error details: \(nsError.userInfo)")
+            
+            // Log more specific error information
+            if let validationErrors = nsError.userInfo[NSValidationKeyErrorKey] as? [String] {
+                print("Validation errors: \(validationErrors)")
+            }
+            if let detailedErrors = nsError.userInfo[NSDetailedErrorsKey] as? [NSError] {
+                for detailedError in detailedErrors {
+                    print("Detailed error: \(detailedError.localizedDescription)")
+                }
+            }
+            
             // Rollback the context to prevent corruption
             context.rollback()
             return nil

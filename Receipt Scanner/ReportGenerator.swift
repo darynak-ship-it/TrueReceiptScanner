@@ -8,9 +8,14 @@
 import SwiftUI
 import PDFKit
 import UniformTypeIdentifiers
+import UIKit
 
 struct ReportGenerator {
-    static func generatePDFReport(receipts: [Receipt]) -> URL? {
+    static func generatePDFReport(
+        receipts: [Receipt],
+        reportNumber: String? = nil,
+        generatedAt: Date = Date()
+    ) -> URL? {
         guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             return nil
         }
@@ -18,43 +23,50 @@ struct ReportGenerator {
         let filename = "receipt_report_\(Int(Date().timeIntervalSince1970)).pdf"
         let pdfURL = documentsDirectory.appendingPathComponent(filename)
         
-        // Create a simple PDF using PDFKit
-        let finalPDF = PDFDocument()
-        let page = PDFPage()
-        
-        // Add some basic content to the page
-        var pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let context = CGContext(data: nil, width: Int(pageRect.width), height: Int(pageRect.height), bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        
-        guard let cgContext = context else { return nil }
-        
-        cgContext.beginPage(mediaBox: &pageRect)
-        
-        // Add title
-        let title = "Receipt Report - \(Date().formatted(date: .abbreviated, time: .omitted))"
-        let titleFont = UIFont.boldSystemFont(ofSize: 18)
-        let titleAttributes: [NSAttributedString.Key: Any] = [
-            .font: titleFont,
-            .foregroundColor: UIColor.black
-        ]
-        title.draw(at: CGPoint(x: 50, y: 750), withAttributes: titleAttributes)
-        
-        // Add receipt count
-        let countText = "Total Receipts: \(receipts.count)"
-        let countFont = UIFont.systemFont(ofSize: 14)
-        let countAttributes: [NSAttributedString.Key: Any] = [
-            .font: countFont,
-            .foregroundColor: UIColor.black
-        ]
-        countText.draw(at: CGPoint(x: 50, y: 720), withAttributes: countAttributes)
-        
-        cgContext.endPage()
-        
-        // Insert the page into the PDF document
-        finalPDF.insert(page, at: 0)
-        
-        finalPDF.write(to: pdfURL)
-        return pdfURL
+        let title = reportNumber ?? "Receipt Report"
+        var renderedImage: UIImage?
+
+        let renderBlock = {
+            let exportView = ReportLayoutView(
+                receipts: receipts,
+                reportNumber: title,
+                generatedAt: generatedAt,
+                onTapReceipt: nil
+            )
+            .padding(.vertical, 24)
+            .padding(.horizontal, 32)
+            .frame(width: 612, alignment: .center)
+            .background(Color.white)
+            .environment(\.colorScheme, .light)
+
+            let renderer = ImageRenderer(content: exportView)
+            renderer.proposedSize = ProposedViewSize(width: 612, height: nil)
+            renderer.scale = UIScreen.main.scale
+            renderedImage = renderer.uiImage
+        }
+
+        if Thread.isMainThread {
+            renderBlock()
+        } else {
+            DispatchQueue.main.sync(execute: renderBlock)
+        }
+
+        guard let image = renderedImage else { return nil }
+
+        let bounds = CGRect(origin: .zero, size: image.size)
+        let pdfRenderer = UIGraphicsPDFRenderer(bounds: bounds)
+
+        do {
+            let pdfData = pdfRenderer.pdfData { context in
+                context.beginPage()
+                image.draw(in: bounds)
+            }
+            try pdfData.write(to: pdfURL)
+            return pdfURL
+        } catch {
+            print("Failed to render PDF report: \(error)")
+            return nil
+        }
     }
     
     static func generateCSVReport(receipts: [Receipt]) -> URL? {
@@ -113,7 +125,7 @@ struct ReportGenerator {
     // MARK: - Report Storage Integration
     
     static func generateAndSavePDFReport(receipts: [Receipt], title: String) -> Report? {
-        guard let pdfURL = generatePDFReport(receipts: receipts) else { return nil }
+        guard let pdfURL = generatePDFReport(receipts: receipts, reportNumber: title, generatedAt: Date()) else { return nil }
         return StorageManager.shared.saveReport(
             title: title,
             type: "PDF",

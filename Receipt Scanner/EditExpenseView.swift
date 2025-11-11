@@ -385,7 +385,7 @@ struct EditExpenseView: View {
         receipt.merchantName = merchantName.isEmpty ? nil : merchantName
         receipt.amount = amount
         receipt.currency = selectedCurrency.code.isEmpty ? "USD" : selectedCurrency.code
-        receipt.date = date
+        receipt.date = date // Ensure date is set (required field)
         receipt.category = selectedCategory.name.isEmpty ? "Other" : selectedCategory.name
         receipt.categoryEmoji = selectedCategory.emoji.isEmpty ? "🗂️" : selectedCategory.emoji
         receipt.paymentMethod = selectedPayment.name.isEmpty ? "Other" : selectedPayment.name
@@ -400,6 +400,21 @@ struct EditExpenseView: View {
         receipt.createdAt = Date()
         receipt.updatedAt = Date()
         
+        // Validate required fields before saving
+        guard receipt.id != nil else {
+            errorMessage = "Failed to save receipt: Missing receipt ID"
+            showErrorAlert = true
+            viewContext.rollback()
+            return
+        }
+        
+        guard receipt.date != nil else {
+            errorMessage = "Failed to save receipt: Missing date"
+            showErrorAlert = true
+            viewContext.rollback()
+            return
+        }
+        
         // Set compression metadata
         if finalImageURL.pathExtension.lowercased() == "zip" {
             receipt.compressionType = "zip"
@@ -408,8 +423,13 @@ struct EditExpenseView: View {
                 let attributes = try FileManager.default.attributesOfItem(atPath: finalImageURL.path)
                 receipt.compressedFileSize = attributes[.size] as? Int64 ?? 0
                 // Estimate original size (ZIP typically compresses to 60-70% of original)
+                if receipt.compressedFileSize > 0 {
                 receipt.originalFileSize = Int64(Double(receipt.compressedFileSize) / 0.65)
                 receipt.compressionRatio = Double(receipt.compressedFileSize) / Double(receipt.originalFileSize)
+                } else {
+                    receipt.originalFileSize = 0
+                    receipt.compressionRatio = 0.0
+                }
             } catch {
                 receipt.compressionType = "zip"
                 receipt.originalFileSize = 0
@@ -446,10 +466,26 @@ struct EditExpenseView: View {
                 onSaved()
             }
         } catch {
-            // Handle save error - show user-friendly error
-            errorMessage = "Failed to save receipt. Please check your device storage and try again."
+            // Handle save error - show user-friendly error with details
+            let nsError = error as NSError
+            var errorDetails = "Failed to save receipt."
+            
+            // Provide more specific error messages
+            if let validationErrors = nsError.userInfo[NSValidationKeyErrorKey] as? [String] {
+                errorDetails += " Validation errors: \(validationErrors.joined(separator: ", "))"
+            } else if let detailedError = nsError.userInfo[NSDetailedErrorsKey] as? [NSError] {
+                let errorMessages = detailedError.compactMap { $0.localizedDescription }
+                if !errorMessages.isEmpty {
+                    errorDetails += " \(errorMessages.joined(separator: "; "))"
+                }
+            } else {
+                errorDetails += " \(nsError.localizedDescription)"
+            }
+            
+            errorMessage = errorDetails
             showErrorAlert = true
             print("Failed to save receipt to Core Data: \(error)")
+            print("Error details: \(nsError.userInfo)")
             // Rollback the context to prevent corruption
             viewContext.rollback()
         }

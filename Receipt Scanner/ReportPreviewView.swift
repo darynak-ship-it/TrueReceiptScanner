@@ -12,94 +12,27 @@ import CoreData
 struct ReportPreviewView: View {
     let receipts: [Receipt]
     let reportNumber: String
+    let generatedAt: Date
     let onBack: () -> Void
     let onGenerate: () -> Void
     
     @State private var selectedReceiptIndex: Int? = nil
     @State private var showReceiptDetail = false
     @State private var detailReceipt: Receipt? = nil
-    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Report \(reportNumber)")
-                                    .font(.title2.bold())
-                                
-                                Text(formatDate(Date()))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Text(formatAmount(totalAmount))
-                                .font(.title2.bold())
-                                .foregroundColor(.accentColor)
-                        }
-                        
-                        Divider()
-                        
-                        // Summary Info
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Date range:")
-                                    .foregroundColor(.secondary)
-                                Text(dateRangeText)
-                                    .fontWeight(.medium)
-                            }
-                            
-                            HStack {
-                                Text("Receipts attached:")
-                                    .foregroundColor(.secondary)
-                                Text("\(receipts.count)")
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        .font(.subheadline)
+                ReportLayoutView(
+                    receipts: receipts,
+                    reportNumber: reportNumber,
+                    generatedAt: generatedAt,
+                    onTapReceipt: { index, receipt in
+                        detailReceipt = receipt
+                        selectedReceiptIndex = index
+                        showReceiptDetail = true
                     }
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                    
-                    // Expense Table
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Expenses")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        expenseTable
-                    }
-                    
-                    // Category Summary
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Category Summary")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        categorySummaryTable
-                    }
-                    
-                    // Receipt Images
-                    if !receipts.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Receipts")
-                                .font(.headline)
-                                .padding(.horizontal)
-                            
-                            ForEach(Array(receipts.enumerated()), id: \.element.id) { index, receipt in
-                                receiptImageView(receipt: receipt, index: index)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical)
+                )
             }
             .navigationTitle("Preview")
             .navigationBarTitleDisplayMode(.inline)
@@ -115,69 +48,157 @@ struct ReportPreviewView: View {
                 }
             }
         }
+        .sheet(isPresented: $showReceiptDetail) {
+            if let receipt = detailReceipt, let index = selectedReceiptIndex {
+                ReceiptDetailView(receipt: receipt, index: index)
+            }
+        }
+    }
+}
+
+struct ReportLayoutView: View {
+    let receipts: [Receipt]
+    let reportNumber: String
+    let generatedAt: Date
+    let onTapReceipt: ((Int, Receipt) -> Void)?
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            headerSection
+            expensesSection
+            categorySection
+            if !receipts.isEmpty {
+                receiptsSection
+            }
+        }
+        .padding(.vertical)
     }
     
-    private var expenseTable: some View {
-        ScrollView(.horizontal, showsIndicators: true) {
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Report \(reportNumber)")
+                        .font(.title2.bold())
+                    
+                    Text(formatFullDate(generatedAt))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Text(formatAmount(totalAmount))
+                    .font(.title2.bold())
+                    .foregroundColor(.accentColor)
+            }
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Date range:")
+                        .foregroundColor(.secondary)
+                    Text(dateRangeText)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Receipts attached:")
+                        .foregroundColor(.secondary)
+                    Text("\(receipts.count)")
+                        .fontWeight(.medium)
+                }
+            }
+            .font(.subheadline)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+    
+    private var expensesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Expenses")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: true) {
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        tableHeaderCell("#", width: 50)
+                        tableHeaderCell("DATE", width: 120)
+                        tableHeaderCell("MERCHANT", width: 160)
+                        tableHeaderCell("CATEGORY", width: 140)
+                        tableHeaderCell("DESCRIPTION", width: 200)
+                        tableHeaderCell("TOTAL", width: 110, alignment: .trailing)
+                    }
+                    .background(Color(UIColor.systemGray6))
+                    
+                    ForEach(Array(receipts.enumerated()), id: \.element.id) { index, receipt in
+                        HStack(spacing: 0) {
+                            tableDataCell("\(index + 1)", width: 50)
+                            tableDataCell(formatShortDate(receipt.date ?? Date()), width: 120)
+                            tableDataCell(receipt.merchantName ?? "Unknown", width: 160)
+                            tableDataCell(receipt.category ?? "Other", width: 140)
+                            tableDataCell(receipt.notes ?? "", width: 200)
+                            tableDataCell(formatAmount(receipt.amount, currency: receipt.currency ?? "USD"), width: 110, alignment: .trailing)
+                        }
+                        .background(index % 2 == 0 ? Color.white : Color(UIColor.systemGray6).opacity(0.2))
+                    }
+                }
+            }
+            .background(Color.white)
+            .cornerRadius(8)
+            .padding(.horizontal)
+        }
+    }
+    
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Category Summary")
+                .font(.headline)
+                .padding(.horizontal)
+            
             VStack(spacing: 0) {
-                // Header Row
                 HStack(spacing: 0) {
-                    tableHeaderCell("#", width: 50)
-                    tableHeaderCell("DATE", width: 120)
-                    tableHeaderCell("MERCHANT", width: 160)
-                    tableHeaderCell("CATEGORY", width: 140)
-                    tableHeaderCell("DESCRIPTION", width: 200)
-                    tableHeaderCell("TOTAL", width: 110, alignment: .trailing)
+                    tableHeaderCell("CATEGORY", width: .infinity)
+                    tableHeaderCell("TOTAL", width: 120, alignment: .trailing)
                 }
                 .background(Color(UIColor.systemGray6))
                 
-                // Data Rows
-                ForEach(Array(receipts.enumerated()), id: \.element.id) { index, receipt in
+                ForEach(categoryTotals.sorted(by: { $0.key < $1.key }), id: \.key) { category, total in
                     HStack(spacing: 0) {
-                        tableDataCell("\(index + 1)", width: 50)
-                        tableDataCell(formatShortDate(receipt.date ?? Date()), width: 120)
-                        tableDataCell(receipt.merchantName ?? "Unknown", width: 160)
-                        tableDataCell(receipt.category ?? "Other", width: 140)
-                        tableDataCell(receipt.notes ?? "", width: 200)
-                        tableDataCell(formatAmount(receipt.amount, currency: receipt.currency ?? "USD"), width: 110, alignment: .trailing)
+                        tableDataCell(category, width: .infinity)
+                        tableDataCell(formatAmount(total, currency: currencyForCategory(category)), width: 120, alignment: .trailing)
                     }
-                    .background(index % 2 == 0 ? Color.white : Color(UIColor.systemGray6).opacity(0.2))
+                    .background(Color.white)
                 }
+                
+                HStack(spacing: 0) {
+                    tableDataCell("TOTAL", width: .infinity, fontWeight: .bold)
+                    tableDataCell(formatAmount(totalAmount), width: 120, alignment: .trailing, fontWeight: .bold)
+                }
+                .background(Color.accentColor.opacity(0.15))
             }
+            .background(Color.white)
+            .cornerRadius(8)
+            .padding(.horizontal)
         }
-        .background(Color.white)
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
     
-    private var categorySummaryTable: some View {
-        VStack(spacing: 0) {
-            // Header Row
-            HStack(spacing: 0) {
-                tableHeaderCell("CATEGORY", width: .infinity)
-                tableHeaderCell("TOTAL", width: 120, alignment: .trailing)
-            }
-            .background(Color(UIColor.systemGray6))
+    private var receiptsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Receipts")
+                .font(.headline)
+                .padding(.horizontal)
             
-            // Category Rows
-            ForEach(categoryTotals.sorted(by: { $0.key < $1.key }), id: \.key) { category, total in
-                HStack(spacing: 0) {
-                    tableDataCell(category, width: .infinity)
-                    tableDataCell(formatAmount(total, currency: getCurrencyForCategory(category)), width: 120, alignment: .trailing)
-                }
-                .background(Color.white)
+            ForEach(Array(receipts.enumerated()), id: \.element.id) { index, receipt in
+                receiptImageView(receipt: receipt, index: index)
             }
-            
-            // Total Row
-            HStack(spacing: 0) {
-                tableDataCell("TOTAL", width: .infinity, fontWeight: .bold)
-                tableDataCell(formatAmount(totalAmount), width: 120, alignment: .trailing, fontWeight: .bold)
-            }
-            .background(Color.accentColor.opacity(0.15))
         }
-        .background(Color.white)
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
     
     private func receiptImageView(receipt: Receipt, index: Int) -> some View {
@@ -186,43 +207,45 @@ struct ReportPreviewView: View {
                 .font(.subheadline.bold())
                 .padding(.horizontal)
             
-            Button(action: {
-                detailReceipt = receipt
-                selectedReceiptIndex = index
-                showReceiptDetail = true
-            }) {
-                Group {
-                    if let imageURL = receipt.imageURL {
-                        loadReceiptImage(from: imageURL)?
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 400)
-                            .cornerRadius(12)
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(UIColor.systemGray5))
-                            .frame(height: 200)
-                            .overlay(
-                                VStack {
-                                    Image(systemName: "doc.text")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.secondary)
-                                    Text("No receipt image")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            )
-                    }
-                }
+            receiptContent(for: receipt, index: index)
+                .padding(.horizontal)
+        }
+    }
+    
+    @ViewBuilder
+    private func receiptContent(for receipt: Receipt, index: Int) -> some View {
+        let content = Group {
+            if let imageURL = receipt.imageURL {
+                loadReceiptImage(from: imageURL)?
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 400)
+                    .cornerRadius(12)
+                    .frame(maxWidth: .infinity)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(UIColor.systemGray5))
+                    .frame(height: 200)
+                    .overlay(
+                        VStack {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            Text("No receipt image")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    )
+            }
+        }
+        
+        if let onTapReceipt {
+            Button(action: { onTapReceipt(index, receipt) }) {
+                content
             }
             .buttonStyle(.plain)
-            .padding(.horizontal)
-        }
-        .sheet(isPresented: $showReceiptDetail) {
-            if let receipt = detailReceipt, let index = selectedReceiptIndex {
-                ReceiptDetailView(receipt: receipt, index: index)
-            }
+        } else {
+            content
         }
     }
     
@@ -269,25 +292,17 @@ struct ReportPreviewView: View {
     }
     
     private var categoryTotals: [String: Double] {
-        var totals: [String: Double] = [:]
-        
-        for receipt in receipts {
+        receipts.reduce(into: [String: Double]()) { partialResult, receipt in
             let category = receipt.category ?? "Other"
-            totals[category, default: 0] += receipt.amount
+            partialResult[category, default: 0] += receipt.amount
         }
-        
-        return totals
     }
     
-    private func getCurrencyForCategory(_ category: String) -> String {
-        // Get currency from the first receipt with this category
-        if let receipt = receipts.first(where: { ($0.category ?? "Other") == category }) {
-            return receipt.currency ?? "USD"
-        }
-        return "USD"
+    private func currencyForCategory(_ category: String) -> String {
+        receipts.first(where: { ($0.category ?? "Other") == category })?.currency ?? "USD"
     }
     
-    private func formatDate(_ date: Date) -> String {
+    private func formatFullDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
         return formatter.string(from: date)
@@ -300,7 +315,6 @@ struct ReportPreviewView: View {
     }
     
     private func formatAmount(_ amount: Double, currency: String = "USD") -> String {
-        // Use appropriate currency symbol
         let currencySymbol: String
         switch currency.uppercased() {
         case "EUR": currencySymbol = "€"
@@ -406,6 +420,7 @@ struct ReceiptDetailView: View {
     return ReportPreviewView(
         receipts: [receipt1],
         reportNumber: "№001",
+        generatedAt: Date(),
         onBack: {},
         onGenerate: {}
     )

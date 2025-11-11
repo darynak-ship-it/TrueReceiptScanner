@@ -30,7 +30,7 @@ struct ReceiptsListView: View {
                 HStack(spacing: 12) {
                     // Filter Options
                     ForEach(ReceiptFilter.allCases, id: \.self) { filter in
-                        FilterChip(
+                        SimpleFilterChip(
                             title: filter.rawValue,
                             isSelected: selectedFilter == filter,
                             action: { selectedFilter = filter }
@@ -166,7 +166,7 @@ struct SearchBar: View {
     }
 }
 
-struct FilterChip: View {
+struct SimpleFilterChip: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
