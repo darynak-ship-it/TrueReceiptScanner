@@ -527,12 +527,12 @@ struct CreateReportView: View {
                     let visibleIDs = filteredReceiptIDs
                     if allVisibleSelected {
                         selectedReceipts.subtract(visibleIDs)
-                    } else {
+                            } else {
                         selectedReceipts.formUnion(visibleIDs)
-                    }
-                }
+                            }
+                        }
                 .disabled(filteredReceiptIDs.isEmpty)
-                .font(.subheadline)
+                        .font(.subheadline)
                 .foregroundColor(filteredReceiptIDs.isEmpty ? .secondary : .accentColor)
                     }
                     .padding(.horizontal)

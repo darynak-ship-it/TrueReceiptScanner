@@ -72,50 +72,86 @@ enum ImageProcessor {
     // MARK: - Document Detection and Perspective Correction
     
     private static func detectAndCorrectPerspective(in image: CIImage) -> CIImage? {
-        let request = VNDetectRectanglesRequest { request, error in
-            // Request completed
+        // Downscale image for faster Vision processing (max 1024px on longest side)
+        // This prevents freezing on large images like 4032x3024
+        let maxDimension: CGFloat = 1024
+        let originalExtent = image.extent
+        let originalWidth = originalExtent.width
+        let originalHeight = originalExtent.height
+        
+        let scale: CGFloat
+        if originalWidth > originalHeight {
+            scale = originalWidth > maxDimension ? maxDimension / originalWidth : 1.0
+        } else {
+            scale = originalHeight > maxDimension ? maxDimension / originalHeight : 1.0
         }
         
-        request.minimumAspectRatio = 0.2
-        request.maximumAspectRatio = 1.0
-        request.minimumSize = 0.2
-        request.minimumConfidence = 0.7
-        request.usesCPUOnly = false
+        let scaledWidth = originalWidth * scale
+        let scaledHeight = originalHeight * scale
         
-        let handler = VNImageRequestHandler(ciImage: image, options: [:])
+        // Create downscaled image for Vision detection
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        guard let cgImage = context.createCGImage(image, from: image.extent) else {
+            print("Failed to create CGImage for downscaling")
+            return nil
+        }
         
-        do {
-            try handler.perform([request])
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: scaledWidth, height: scaledHeight))
+        let downscaledUIImage = renderer.image { _ in
+            UIImage(cgImage: cgImage).draw(in: CGRect(origin: .zero, size: CGSize(width: scaledWidth, height: scaledHeight)))
+        }
+        
+        guard let downscaledCGImage = downscaledUIImage.cgImage else {
+            print("Failed to create downscaled CGImage")
+            return nil
+        }
+        
+        let downscaledCIImage = CIImage(cgImage: downscaledCGImage)
+        
+        print("Downscaled image from \(originalWidth) x \(originalHeight) to \(scaledWidth) x \(scaledHeight) for Vision detection")
+        
+        // Use a semaphore to wait for async Vision request completion
+        // This is safe because we're already on a background thread
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: CIImage? = nil
+        
+        let request = VNDetectRectanglesRequest { request, error in
+            defer { semaphore.signal() }
+            
+            if let error = error {
+                print("Error detecting rectangle: \(error.localizedDescription)")
+                return
+            }
             
             guard let results = request.results,
                   !results.isEmpty,
                   let rectangle = results.first as? VNRectangleObservation,
                   rectangle.confidence > 0.7 else {
                 // No rectangle detected or low confidence, return original
-                return nil
+                return
             }
             
-            // Get the four corners of the detected rectangle
+            // Get the four corners of the detected rectangle (in normalized coordinates)
             let topLeft = rectangle.topLeft
             let topRight = rectangle.topRight
             let bottomRight = rectangle.bottomRight
             let bottomLeft = rectangle.bottomLeft
             
-            // Calculate perspective transform coordinates
+            // Scale coordinates back to original image size
             let inputQuad = [
-                CIVector(x: topLeft.x * image.extent.width, y: (1 - topLeft.y) * image.extent.height),
-                CIVector(x: topRight.x * image.extent.width, y: (1 - topRight.y) * image.extent.height),
-                CIVector(x: bottomRight.x * image.extent.width, y: (1 - bottomRight.y) * image.extent.height),
-                CIVector(x: bottomLeft.x * image.extent.width, y: (1 - bottomLeft.y) * image.extent.height)
+                CIVector(x: topLeft.x * originalWidth, y: (1 - topLeft.y) * originalHeight),
+                CIVector(x: topRight.x * originalWidth, y: (1 - topRight.y) * originalHeight),
+                CIVector(x: bottomRight.x * originalWidth, y: (1 - bottomRight.y) * originalHeight),
+                CIVector(x: bottomLeft.x * originalWidth, y: (1 - bottomLeft.y) * originalHeight)
             ]
             
-            // Calculate document dimensions
-            let width = sqrt(pow(topRight.x - topLeft.x, 2) + pow(topRight.y - topLeft.y, 2)) * image.extent.width
-            let height = sqrt(pow(bottomLeft.x - topLeft.x, 2) + pow(bottomLeft.y - topLeft.y, 2)) * image.extent.height
+            // Calculate document dimensions in original image coordinates
+            let width = sqrt(pow(topRight.x - topLeft.x, 2) + pow(topRight.y - topLeft.y, 2)) * originalWidth
+            let height = sqrt(pow(bottomLeft.x - topLeft.x, 2) + pow(bottomLeft.y - topLeft.y, 2)) * originalHeight
             
-            // Apply perspective correction filter
+            // Apply perspective correction filter to original image
             guard let perspectiveFilter = CIFilter(name: "CIPerspectiveCorrection") else {
-                return nil
+                return
             }
             
             perspectiveFilter.setValue(image, forKey: kCIInputImageKey)
@@ -125,11 +161,28 @@ enum ImageProcessor {
             perspectiveFilter.setValue(inputQuad[3], forKey: "inputBottomLeft")
             
             guard let correctedImage = perspectiveFilter.outputImage else {
-                return nil
+                return
             }
             
-            return correctedImage.cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
-            
+            result = correctedImage.cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        
+        request.minimumAspectRatio = 0.2
+        request.maximumAspectRatio = 1.0
+        request.minimumSize = 0.2
+        request.minimumConfidence = 0.7
+        request.usesCPUOnly = false
+        
+        let handler = VNImageRequestHandler(ciImage: downscaledCIImage, options: [:])
+        
+        do {
+            try handler.perform([request])
+            // Wait for completion with timeout (3 seconds max)
+            if semaphore.wait(timeout: .now() + 3.0) == .timedOut {
+                print("Rectangle detection timed out, skipping perspective correction")
+                return nil
+            }
+            return result
         } catch {
             print("Error detecting rectangle: \(error)")
             return nil

@@ -48,6 +48,7 @@ struct ManualExpenseView: View {
     @State private var taxDeductible: Bool = false
     @State private var tagsText: String = ""
     @State private var notes: String = ""
+    @FocusState private var isTagFieldFocused: Bool
     
     // Image attachment
     @State private var attachedImage: UIImage? = nil
@@ -100,6 +101,17 @@ struct ManualExpenseView: View {
         Category(name: "Relocation expenses", emoji: "📦"),
         Category(name: "Client-related expenses", emoji: "🤝"),
         Category(name: "Other", emoji: "🗂️")
+    ]
+    
+    private let methods: [PaymentMethod] = [
+        PaymentMethod(name: "Credit Card", emoji: "💳"),
+        PaymentMethod(name: "Debit Card", emoji: "🤑"),
+        PaymentMethod(name: "PayPal", emoji: "🔹"),
+        PaymentMethod(name: "Apple Pay/Google Pay", emoji: "🤳"),
+        PaymentMethod(name: "Bank Transfer", emoji: "⏩"),
+        PaymentMethod(name: "Cash", emoji: "💸"),
+        PaymentMethod(name: "Prepaid Cards", emoji: "🎁"),
+        PaymentMethod(name: "Other", emoji: "❓")
     ]
     
     var body: some View {
@@ -179,6 +191,8 @@ struct ManualExpenseView: View {
                         Text("Merchant Name")
                             .font(.headline)
                         TextField("Enter merchant name", text: $merchantName)
+                            .textFieldStyle(.plain)
+                            .foregroundColor(.primary)
                             .padding(12)
                             .background(themeManager.textFieldBackgroundColor)
                             .cornerRadius(8)
@@ -201,6 +215,8 @@ struct ManualExpenseView: View {
                         HStack(spacing: 12) {
                             TextField("0.00", text: $totalAmountText)
                                 .keyboardType(.decimalPad)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.primary)
                                 .padding(12)
                                 .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
@@ -218,33 +234,43 @@ struct ManualExpenseView: View {
                         }
                     }
                     
-                    // Field 4 - Category (single-line label + preview)
-                    HStack {
+                    // Field 4 - Category (Menu-based selection)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Category")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showCategorySheet = true }) {
-                            HStack(spacing: 8) {
-                                Text(selectedCategory.emoji)
-                                Text(selectedCategory.name)
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Menu {
+                            ForEach(categories, id: \.id) { category in
+                                Button(action: { selectedCategory = category }) {
+                                    Label(category.name, systemImage: selectedCategory == category ? "checkmark.circle.fill" : "circle")
+                                }
                             }
+                        } label: {
+                            FilterMenuLabel(
+                                title: "\(selectedCategory.emoji) \(selectedCategory.name)",
+                                count: 0
+                            )
                         }
                     }
                     
-                    // Field 5 - Payment Method
-                    HStack {
+                    // Field 5 - Payment Method (Menu-based selection)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Payment Method")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showPaymentSheet = true }) {
-                            HStack(spacing: 8) {
-                                Text(selectedPayment.emoji)
-                                Text(selectedPayment.name)
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Menu {
+                            ForEach(methods, id: \.id) { method in
+                                Button(action: { selectedPayment = method }) {
+                                    Label(method.name, systemImage: selectedPayment == method ? "checkmark.circle.fill" : "circle")
+                                }
                             }
+                        } label: {
+                            FilterMenuLabel(
+                                title: "\(selectedPayment.emoji) \(selectedPayment.name)",
+                                count: 0
+                            )
                         }
                     }
                     
@@ -268,7 +294,10 @@ struct ManualExpenseView: View {
                                     .padding(.leading, 12)
                             }
                             TextField("", text: $tagsText)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.primary)
                                 .padding(12)
+                                .focused($isTagFieldFocused)
                         }
                         .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
@@ -286,6 +315,7 @@ struct ManualExpenseView: View {
                                     .padding(.leading, 12)
                             }
                             TextEditor(text: $notes)
+                                .foregroundColor(.primary)
                                 .frame(minHeight: 120)
                                 .padding(4)
                                 .scrollContentBackground(.hidden)
@@ -320,18 +350,36 @@ struct ManualExpenseView: View {
                 Button("Cancel", action: onCancel)
                     .foregroundColor(.accentColor)
             }
+            
+            ToolbarItemGroup(placement: .keyboard) {
+                if isTagFieldFocused {
+                    Button("#") {
+                        // Insert # at the end of the text
+                        // Add space before # if text doesn't end with space or comma
+                        if tagsText.isEmpty || tagsText.last == " " || tagsText.last == "," {
+                            tagsText += "#"
+                        } else {
+                            tagsText += " #"
+                        }
+                    }
+                    .font(.title2)
+                    .foregroundColor(.accentColor)
+                    .padding(.trailing, 8)
+                    
+                    Spacer()
+                    
+                    Button("Done") {
+                        isTagFieldFocused = false
+                    }
+                    .foregroundColor(.accentColor)
+                }
+            }
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(selectedImage: $attachedImage)
         }
         .sheet(isPresented: $showCurrencySheet) {
             CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
-        }
-        .sheet(isPresented: $showCategorySheet) {
-            CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet, themeManager: themeManager)
-        }
-        .sheet(isPresented: $showPaymentSheet) {
-            PaymentPickerView(selected: $selectedPayment, isPresented: $showPaymentSheet, themeManager: themeManager)
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }

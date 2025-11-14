@@ -58,14 +58,9 @@ class ThemeManager: ObservableObject {
     }
     
     var textFieldBackgroundColor: Color {
-        switch appTheme {
-        case "light":
-            return Color.white
-        case "dark":
-            return Color.gray.opacity(0.2)
-        default:
-            return Color.white
-        }
+        // Use system color that automatically adapts to light/dark mode
+        // This provides proper contrast in both themes
+        return Color(UIColor.secondarySystemBackground)
     }
     
     var selectionColor: Color {

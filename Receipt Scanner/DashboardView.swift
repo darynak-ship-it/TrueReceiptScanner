@@ -17,10 +17,15 @@ struct DashboardView: View {
     let onManualExpense: () -> Void
     let onCreateReport: () -> Void
     
+    @AppStorage("defaultCurrency") private var defaultCurrency: String = "USD"
     @StateObject private var storageManager = StorageManager.shared
     @State private var recentActivities: [RecentActivityItem] = []
     @State private var monthlyStats: (totalAmount: Double, receiptCount: Int) = (0, 0)
     @State private var totalReceiptCount: Int = 0
+    @State private var selectedReceiptForEdit: Receipt? = nil
+    @State private var selectedReportForView: Report? = nil
+    @State private var showShareSheet = false
+    @State private var shareItems: [Any] = []
     
     var body: some View {
         ScrollView {
@@ -105,7 +110,9 @@ struct DashboardView: View {
                             .padding(.vertical, 20)
                         } else {
                             ForEach(recentActivities) { activity in
-                                RecentActivityRow(activity: activity)
+                                RecentActivityRow(activity: activity) {
+                                    handleActivityTap(activity)
+                                }
                             }
                         }
                     }
@@ -116,7 +123,7 @@ struct DashboardView: View {
                 HStack(spacing: 12) {
                     StatCard(
                         title: "This Month",
-                        value: String(format: "$%.2f", monthlyStats.totalAmount),
+                        value: formatAmount(monthlyStats.totalAmount, currency: defaultCurrency),
                         subtitle: "\(monthlyStats.receiptCount) receipts"
                     )
                     
@@ -146,18 +153,84 @@ struct DashboardView: View {
         .onAppear {
             loadDashboardData()
         }
+        .onChange(of: defaultCurrency) { _ in
+            loadDashboardData()
+        }
         .onReceive(storageManager.$receipts) { _ in
             loadDashboardData()
         }
         .onReceive(storageManager.$reports) { _ in
             loadDashboardData()
         }
+        .sheet(isPresented: Binding(
+            get: { selectedReceiptForEdit != nil },
+            set: { if !$0 { selectedReceiptForEdit = nil } }
+        )) {
+            if let receipt = selectedReceiptForEdit {
+                NavigationStack {
+                    EditManualExpenseView(
+                        receipt: receipt,
+                        onSaved: {
+                            selectedReceiptForEdit = nil
+                            storageManager.refreshReceipts()
+                            loadDashboardData()
+                        },
+                        onCancel: {
+                            selectedReceiptForEdit = nil
+                        }
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if !shareItems.isEmpty {
+                ShareSheet(items: shareItems)
+            }
+        }
     }
     
     private func loadDashboardData() {
         recentActivities = storageManager.fetchRecentActivities(limit: 5)
-        monthlyStats = storageManager.getMonthlyStatistics()
+        monthlyStats = storageManager.getMonthlyStatistics(currency: nil) // Show all receipts regardless of currency
         totalReceiptCount = storageManager.getTotalReceiptCount()
+    }
+    
+    private func handleActivityTap(_ activity: RecentActivityItem) {
+        switch activity.type {
+        case .receipt:
+            if let receiptID = activity.receiptID {
+                selectedReceiptForEdit = storageManager.fetchReceipt(by: receiptID)
+            }
+        case .report:
+            if let reportID = activity.reportID {
+                if let report = storageManager.fetchReport(by: reportID) {
+                    selectedReportForView = report
+                    if let fileURL = report.fileURL {
+                        shareItems = [fileURL]
+                        showShareSheet = true
+                    }
+                }
+            }
+        }
+    }
+    
+    private func formatAmount(_ amount: Double, currency: String = "USD") -> String {
+        let currencySymbol: String
+        switch currency.uppercased() {
+        case "EUR": currencySymbol = "€"
+        case "GBP": currencySymbol = "£"
+        case "USD": currencySymbol = "$"
+        case "JPY": currencySymbol = "¥"
+        case "CAD": currencySymbol = "C$"
+        case "AUD": currencySymbol = "A$"
+        case "CHF": currencySymbol = "CHF"
+        case "CNY": currencySymbol = "¥"
+        case "INR": currencySymbol = "₹"
+        case "BRL": currencySymbol = "R$"
+        default: currencySymbol = currency
+        }
+        
+        return String(format: "\(currencySymbol)%.2f", amount)
     }
 }
 
@@ -196,9 +269,11 @@ struct QuickActionCard: View {
 
 struct RecentActivityRow: View {
     let activity: RecentActivityItem
+    let action: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
+        Button(action: action) {
+            HStack(spacing: 12) {
             // Activity thumbnail
             if let thumbnailURL = activity.thumbnailURL {
                 AsyncImage(url: thumbnailURL) { image in
@@ -251,8 +326,10 @@ struct RecentActivityRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            }
+            .padding(.vertical, 8)
         }
-        .padding(.vertical, 8)
+        .buttonStyle(.plain)
     }
 }
 
@@ -280,6 +357,17 @@ struct StatCard: View {
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(12)
     }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {

@@ -53,6 +53,7 @@ struct EditExpenseView: View {
     @State private var taxDeductible: Bool = false
     @State private var tagsText: String = ""
     @State private var notes: String = ""
+    @FocusState private var isTagFieldFocused: Bool
 
     // Sheet toggles
     @State private var showCurrencySheet: Bool = false
@@ -99,6 +100,17 @@ struct EditExpenseView: View {
         Category(name: "Relocation expenses", emoji: "📦"),
         Category(name: "Client-related expenses", emoji: "🤝"),
         Category(name: "Other", emoji: "🗂️")
+    ]
+    
+    private let methods: [PaymentMethod] = [
+        PaymentMethod(name: "Credit Card", emoji: "💳"),
+        PaymentMethod(name: "Debit Card", emoji: "🤑"),
+        PaymentMethod(name: "PayPal", emoji: "🔹"),
+        PaymentMethod(name: "Apple Pay/Google Pay", emoji: "🤳"),
+        PaymentMethod(name: "Bank Transfer", emoji: "⏩"),
+        PaymentMethod(name: "Cash", emoji: "💸"),
+        PaymentMethod(name: "Prepaid Cards", emoji: "🎁"),
+        PaymentMethod(name: "Other", emoji: "❓")
     ]
 
     var body: some View {
@@ -149,6 +161,8 @@ struct EditExpenseView: View {
                         Text("Merchant Name")
                             .font(.headline)
                         TextField("Item 1: Sample Item", text: $merchantName)
+                            .textFieldStyle(.plain)
+                            .foregroundColor(.primary)
                             .padding(12)
                             .background(themeManager.textFieldBackgroundColor)
                             .cornerRadius(8)
@@ -171,6 +185,8 @@ struct EditExpenseView: View {
                         HStack(spacing: 12) {
                             TextField("0.0", text: $totalAmountText)
                                 .keyboardType(.decimalPad)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.primary)
                                 .padding(12)
                                 .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
@@ -188,33 +204,43 @@ struct EditExpenseView: View {
                         }
                     }
 
-                    // Field 4 - Category (single-line label + preview)
-                    HStack {
+                    // Field 4 - Category (Menu-based selection)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Category")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showCategorySheet = true }) {
-                            HStack(spacing: 8) {
-                                Text(selectedCategory.emoji)
-                                Text(selectedCategory.name)
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Menu {
+                            ForEach(categories, id: \.id) { category in
+                                Button(action: { selectedCategory = category }) {
+                                    Label(category.name, systemImage: selectedCategory == category ? "checkmark.circle.fill" : "circle")
+                                }
                             }
+                        } label: {
+                            FilterMenuLabel(
+                                title: "\(selectedCategory.emoji) \(selectedCategory.name)",
+                                count: 0
+                            )
                         }
                     }
 
-                    // Field 5 - Payment Method
-                    HStack {
+                    // Field 5 - Payment Method (Menu-based selection)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Payment Method")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showPaymentSheet = true }) {
-                            HStack(spacing: 8) {
-                                Text(selectedPayment.emoji)
-                                Text(selectedPayment.name)
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Menu {
+                            ForEach(methods, id: \.id) { method in
+                                Button(action: { selectedPayment = method }) {
+                                    Label(method.name, systemImage: selectedPayment == method ? "checkmark.circle.fill" : "circle")
+                                }
                             }
+                        } label: {
+                            FilterMenuLabel(
+                                title: "\(selectedPayment.emoji) \(selectedPayment.name)",
+                                count: 0
+                            )
                         }
                     }
 
@@ -238,7 +264,10 @@ struct EditExpenseView: View {
                                     .padding(.leading, 12)
                             }
                             TextField("", text: $tagsText)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.primary)
                                 .padding(12)
+                                .focused($isTagFieldFocused)
                         }
                         .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
@@ -256,6 +285,7 @@ struct EditExpenseView: View {
                                     .padding(.leading, 12)
                             }
                             TextEditor(text: $notes)
+                                .foregroundColor(.primary)
                                 .frame(minHeight: 120)
                                 .padding(4)
                                 .scrollContentBackground(.hidden)
@@ -290,6 +320,30 @@ struct EditExpenseView: View {
                 Button("Back", action: onScanAnother)
                     .foregroundColor(.accentColor)
             }
+            
+            ToolbarItemGroup(placement: .keyboard) {
+                if isTagFieldFocused {
+                    Button("#") {
+                        // Insert # at the end of the text
+                        // Add space before # if text doesn't end with space or comma
+                        if tagsText.isEmpty || tagsText.last == " " || tagsText.last == "," {
+                            tagsText += "#"
+                        } else {
+                            tagsText += " #"
+                        }
+                    }
+                    .font(.title2)
+                    .foregroundColor(.accentColor)
+                    .padding(.trailing, 8)
+                    
+                    Spacer()
+                    
+                    Button("Done") {
+                        isTagFieldFocused = false
+                    }
+                    .foregroundColor(.accentColor)
+                }
+            }
         }
         .onAppear {
             prefillFromOCR()
@@ -303,12 +357,6 @@ struct EditExpenseView: View {
         }
         .sheet(isPresented: $showCurrencySheet) {
             CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
-        }
-        .sheet(isPresented: $showCategorySheet) {
-            CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet, themeManager: themeManager)
-        }
-        .sheet(isPresented: $showPaymentSheet) {
-            PaymentPickerView(selected: $selectedPayment, isPresented: $showPaymentSheet, themeManager: themeManager)
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }
@@ -357,6 +405,14 @@ struct EditExpenseView: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         
+        // Validate that the image file exists before saving
+        guard FileManager.default.fileExists(atPath: imageURL.path) else {
+            errorMessage = "Failed to save receipt: Image file not found. Please try scanning again."
+            showErrorAlert = true
+            print("ERROR: Image file does not exist at path: \(imageURL.path)")
+            return
+        }
+        
         // Use the existing image URL from scanning - no need to save again
         // The image was already saved during the scanning process in ScannerContainer
         let finalImageURL = imageURL
@@ -370,8 +426,7 @@ struct EditExpenseView: View {
         } else {
             // Regular files need separate thumbnail
             // Don't fail if thumbnail creation fails - just proceed without it
-            if FileManager.default.fileExists(atPath: imageURL.path),
-               let image = UIImage(contentsOfFile: imageURL.path) {
+            if let image = UIImage(contentsOfFile: imageURL.path) {
                 let thumbnailResult = StorageManager.shared.saveReceiptImage(image, compressionQuality: 0.3)
                 thumbnailURL = thumbnailResult.thumbnailURL
             } else {
@@ -494,7 +549,9 @@ struct EditExpenseView: View {
     // Enhanced OCR text parsing and prefill logic
     private func prefillFromOCR() {
         let text = recognizedText
-        print("Prefilling from OCR text: \(text)")
+        print("=== OCR TEXT DEBUG ===")
+        print("Full OCR text:\n\(text)")
+        print("Number of lines: \(text.components(separatedBy: .newlines).count)")
         
         // Extract merchant name
         extractMerchantName(from: text)
@@ -508,7 +565,12 @@ struct EditExpenseView: View {
         // Extract category based on merchant name or keywords
         extractCategory(from: text)
         
-        print("Prefilled fields - Merchant: '\(merchantName)', Amount: '\(totalAmountText)', Currency: '\(selectedCurrency.code)', Date: \(date)")
+        print("=== EXTRACTION RESULTS ===")
+        print("Merchant: '\(merchantName)'")
+        print("Amount: '\(totalAmountText)'")
+        print("Currency: '\(selectedCurrency.code)'")
+        print("Date: \(date)")
+        print("========================")
     }
     
     private func extractMerchantName(from text: String) {
@@ -516,26 +578,34 @@ struct EditExpenseView: View {
         
         let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
         
-        // Try various patterns for merchant name
+        // Try various patterns for merchant name (case insensitive where helpful)
         let merchantPatterns = [
-            // Explicit merchant/store labels
-            "(?:Store|Merchant|Company|Business|Restaurant|Hotel|Shop)[:\\s]+(.+)",
+            // Explicit merchant/store labels (case insensitive, more flexible)
+            "(?i)(?:Store|Merchant|Company|Business|Restaurant|Hotel|Shop|Vendor|Retailer)[:\\s]+(.+)",
             // Common receipt headers
-            "^([A-Za-z][A-Za-z0-9\\s&.-]+(?:Hotel|Restaurant|Cafe|Store|Shop|Market|Center|Mall|Plaza))",
+            "^([A-Za-z][A-Za-z0-9\\s&'.-]{2,}(?:Hotel|Restaurant|Cafe|Store|Shop|Market|Center|Mall|Plaza|Inc|LLC|Ltd))",
             // First substantial line (not receipt, total, date, etc.)
-            "^([A-Za-z][A-Za-z0-9\\s&.-]{3,})$"
+            "^([A-Za-z][A-Za-z0-9\\s&'.-]{3,})$"
         ]
         
         for pattern in merchantPatterns {
             if let merchant = firstMatch(in: text, pattern: pattern) {
                 // Filter out common non-merchant words
                 let filteredMerchant = merchant.trimmingCharacters(in: .whitespaces)
-                if !filteredMerchant.lowercased().contains("receipt") &&
-                   !filteredMerchant.lowercased().contains("total") &&
-                   !filteredMerchant.lowercased().contains("date") &&
-                   !filteredMerchant.lowercased().contains("time") &&
+                let lowercased = filteredMerchant.lowercased()
+                
+                if !lowercased.contains("receipt") &&
+                   !lowercased.contains("total") &&
+                   !lowercased.contains("date") &&
+                   !lowercased.contains("time") &&
+                   !lowercased.contains("amount") &&
+                   !lowercased.contains("subtotal") &&
+                   !lowercased.contains("tax") &&
+                   !lowercased.contains("change") &&
+                   !lowercased.contains("thank") &&
                    filteredMerchant.count > 2 {
                     merchantName = filteredMerchant
+                    print("✅ Extracted merchant: \(filteredMerchant)")
                     return
                 }
             }
@@ -543,113 +613,165 @@ struct EditExpenseView: View {
         
         // Fallback: use first non-empty line that looks like a business name
         for line in lines {
-            if line.count > 3 && 
-               !line.lowercased().contains("receipt") &&
-               !line.lowercased().contains("total") &&
-               !line.lowercased().contains("date") &&
-               !line.lowercased().contains("time") &&
-               !line.contains("$") &&
-               !line.contains("€") &&
-               !line.contains("£") &&
-               !matchesPattern(line, pattern: "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}") {
-                merchantName = line
-                return
+            if line.count > 2 {
+                let lowercased = line.lowercased()
+                if !lowercased.contains("receipt") &&
+                   !lowercased.contains("total") &&
+                   !lowercased.contains("date") &&
+                   !lowercased.contains("time") &&
+                   !lowercased.contains("amount") &&
+                   !line.contains("$") &&
+                   !line.contains("€") &&
+                   !line.contains("£") &&
+                   !matchesPattern(line, pattern: "\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}") && // dates
+                   !matchesPattern(line, pattern: "\\d{1,2}:\\d{2}") && // times
+                   !matchesPattern(line, pattern: "^\\s*\\d+[.,]?\\d*\\s*$") { // just numbers
+                    merchantName = line
+                    print("✅ Extracted merchant (fallback): \(line)")
+                    return
+                }
             }
         }
+        print("❌ No merchant name extracted")
     }
     
     private func extractDate(from text: String) {
-        let datePatterns = [
+        // More comprehensive date patterns with proper capture groups
+        let datePatterns: [(pattern: String, formatters: [String])] = [
             // ISO format: 2024-10-16 or 2024/10/16
-            "(\\d{4}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01]))",
+            ("(\\d{4}[-/]\\d{1,2}[-/]\\d{1,2})", ["yyyy-MM-dd", "yyyy/MM/dd", "yyyy-M-d", "yyyy/M/d"]),
             // US format: 10/16/2024 or 10-16-2024
-            "(?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01])[-/](\\d{4})",
+            ("(\\d{1,2}[-/]\\d{1,2}[-/]\\d{4})", ["MM/dd/yyyy", "MM-dd-yyyy", "M/d/yyyy", "M-dd-yyyy", "MM-d-yyyy", "M-d-yyyy"]),
             // European format: 16/10/2024 or 16-10-2024
-            "(?:0?[1-9]|[12]\\d|3[01])[-/](?:0?[1-9]|1[0-2])[-/](\\d{4})",
+            ("(\\d{1,2}[-/]\\d{1,2}[-/]\\d{4})", ["dd/MM/yyyy", "dd-MM-yyyy", "d/M/yyyy", "d-MM-yyyy", "dd-M-yyyy", "d-M-yyyy"]),
+            // 2-digit year formats: 10/16/24
+            ("(\\d{1,2}[-/]\\d{1,2}[-/]\\d{2})", ["MM/dd/yy", "MM-dd-yy", "M/d/yy", "dd/MM/yy", "dd-MM-yy"]),
             // Month name format: Oct 16, 2024 or October 16, 2024
-            "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\\s+(?:0?[1-9]|[12]\\d|3[01]),?\\s+(\\d{4})"
+            ("((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2},?\\s+\\d{4})", ["MMM d, yyyy", "MMMM d, yyyy", "MMM d yyyy", "MMMM d yyyy"]),
+            // Date with labels: Date: 10/16/2024
+            ("(?i)(?:Date|Dated?|On)[:\\s]+(\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4})", ["MM/dd/yyyy", "MM-dd-yyyy", "dd/MM/yyyy", "dd-MM-yyyy", "MM/dd/yy", "dd/MM/yy"]),
+            // Date with labels: Date: Oct 16, 2024
+            ("(?i)(?:Date|Dated?|On)[:\\s]+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2},?\\s+\\d{4})", ["MMM d, yyyy", "MMMM d, yyyy"])
         ]
         
-        for pattern in datePatterns {
+        for (pattern, formatters) in datePatterns {
             if let dateStr = firstMatch(in: text, pattern: pattern) {
-                let formatters = [
-                    "yyyy-MM-dd",
-                    "yyyy/MM/dd", 
-                    "MM/dd/yyyy",
-                    "MM-dd-yyyy",
-                    "dd/MM/yyyy",
-                    "dd-MM-yyyy",
-                    "MMM d, yyyy",
-                    "MMMM d, yyyy"
-                ]
-                
                 for format in formatters {
-            let formatter = DateFormatter()
+                    let formatter = DateFormatter()
                     formatter.dateFormat = format
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    
+                    // Handle 2-digit years
+                    if format.contains("yy") && !format.contains("yyyy") {
+                        formatter.twoDigitStartDate = Calendar.current.date(byAdding: .year, value: -80, to: Date())
+                    }
+                    
                     if let parsedDate = formatter.date(from: dateStr) {
-                        date = parsedDate
-                        return
+                        // Validate date is reasonable (not too far in past/future)
+                        let calendar = Calendar.current
+                        let yearsAgo = calendar.dateComponents([.year], from: parsedDate, to: Date()).year ?? 0
+                        if yearsAgo >= 0 && yearsAgo <= 10 {
+                            date = parsedDate
+                            print("✅ Extracted date: \(dateStr) -> \(parsedDate)")
+                            return
+                        }
                     }
                 }
             }
         }
+        print("❌ No date extracted from text")
     }
     
     private func extractAmountAndCurrency(from text: String) {
         if !totalAmountText.isEmpty { return }
         
-        // Currency symbols and their codes
+        // Expanded currency symbols and codes
         let currencyMap: [String: String] = [
             "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", 
             "C$": "CAD", "A$": "AUD", "CHF": "CHF", "kr": "SEK",
-            "₹": "INR", "₽": "RUB", "₩": "KRW", "₪": "ILS"
+            "₹": "INR", "₽": "RUB", "₩": "KRW", "₪": "ILS",
+            "R$": "BRL", "NZ$": "NZD", "S$": "SGD", "HK$": "HKD"
         ]
         
-        // Amount patterns - look for various formats
+        // First, try to detect currency separately
+        var detectedCurrency: String? = nil
+        
+        // Look for currency codes in text (case insensitive)
+        let currencyCodePattern = "(?i)\\b(USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD)\\b"
+        if let currencyCode = firstMatch(in: text, pattern: currencyCodePattern) {
+            detectedCurrency = currencyCode.uppercased()
+            print("✅ Found currency code: \(detectedCurrency!)")
+        }
+        
+        // Look for currency symbols in text
+        if detectedCurrency == nil {
+            for (symbol, code) in currencyMap {
+                if text.contains(symbol) {
+                    detectedCurrency = code
+                    print("✅ Found currency symbol: \(symbol) -> \(code)")
+                    break
+                }
+            }
+        }
+        
+        // Enhanced amount patterns - handle commas, spaces, various formats
         let amountPatterns = [
-            // Total with currency symbol: $12.34, €45.67
-            "([$€£¥C$A$₹₽₩₪])\\s*([0-9]+(?:\\.[0-9]{1,2})?)",
-            // Total without currency: Total: 12.34, Amount: 45.67
-            "(?:Total|Amount|Sum|Subtotal|Grand Total)[:\\s]*([0-9]+(?:\\.[0-9]{1,2})?)",
-            // Just numbers that look like amounts: 12.34, 123.45
-            "\\b([0-9]+(?:\\.[0-9]{1,2})?)\\b"
+            // Total with currency symbol before: $12.34, $1,234.56, $ 12.34
+            "(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)",
+            // Total with currency symbol after: 12.34 USD, 1,234.56 EUR
+            "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)\\s*(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD)",
+            // Total with label: Total: $12.34, Amount: 45.67, Sum: 123.45
+            "(?i)(?:Total|Amount|Sum|Subtotal|Grand Total|Balance|Due|Paid|Charge)[:\\s]*(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)?\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)",
+            // Just amounts that look like totals (larger numbers, often at end of receipt)
+            "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)\\s*(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD)?"
         ]
         
         var foundAmount: String?
-        var foundCurrency: String = "USD" // default
+        var foundAmountValue: Double = 0
         
+        // Try patterns in order of specificity
         for pattern in amountPatterns {
             if let match = firstMatch(in: text, pattern: pattern) {
-                // Check if it contains currency symbol
-                for (symbol, code) in currencyMap {
-                    if match.contains(symbol) {
-                        foundCurrency = code
-                        // Extract just the number part
-                        if let amount = firstMatch(in: match, pattern: "([0-9]+(?:\\.[0-9]{1,2})?)") {
-                            foundAmount = amount
-                            break
+                // Clean the amount string
+                var cleanAmount = match.trimmingCharacters(in: .whitespaces)
+                // Remove commas and spaces from number
+                cleanAmount = cleanAmount.replacingOccurrences(of: "[,\\s]", with: "", options: .regularExpression)
+                
+                if let value = Double(cleanAmount), value > 0 {
+                    // Prefer larger amounts (likely totals) and amounts near currency symbols/labels
+                    if value > foundAmountValue || foundAmount == nil {
+                        foundAmount = cleanAmount
+                        foundAmountValue = value
+                        print("✅ Found amount candidate: \(cleanAmount) (value: \(value))")
+                        
+                        // If this pattern had a currency indicator, use it
+                        if pattern.contains("USD|EUR") || pattern.contains("[$€£") {
+                            break // Found amount with currency, use it
                         }
                     }
                 }
-                
-                // If no currency symbol, check if it's a reasonable amount
-                if foundAmount == nil {
-                    let amount = match.trimmingCharacters(in: .whitespaces)
-                    if let value = Double(amount), value > 0 && value < 10000 {
-                        foundAmount = amount
-                    }
-                }
             }
-            
-            if foundAmount != nil { break }
         }
         
+        // If we found an amount, set it
         if let amount = foundAmount {
             totalAmountText = amount
-            // Update currency if we found one
-            if let currencyCode = currencyMap.values.first(where: { $0 == foundCurrency }) {
-                selectedCurrency = Currency(code: foundCurrency, flag: getFlagForCurrency(foundCurrency))
+            
+            // Set currency if detected
+            if let currency = detectedCurrency {
+                if let currencyObj = currencies.first(where: { $0.code == currency }) {
+                    selectedCurrency = currencyObj
+                    print("✅ Set currency to: \(currency)")
+                }
+            } else {
+                // Default to USD if no currency found
+                if let usdCurrency = currencies.first(where: { $0.code == "USD" }) {
+                    selectedCurrency = usdCurrency
+                    print("⚠️ No currency found, defaulting to USD")
+                }
             }
+        } else {
+            print("❌ No amount extracted from text")
         }
     }
     

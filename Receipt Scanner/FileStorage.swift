@@ -653,7 +653,7 @@ class StorageManager: ObservableObject {
         do {
             try context.save()
             refreshReceipts()
-            print("Successfully saved receipt: \(merchantName) - $\(amount)")
+            print("Successfully saved receipt: \(merchantName ?? "Unknown") - $\(amount)")
             return receipt
         } catch {
             let nsError = error as NSError
@@ -919,7 +919,9 @@ class StorageManager: ObservableObject {
                 currency: receipt.currency,
                 date: receipt.date ?? Date(),
                 thumbnailURL: receipt.thumbnailURL,
-                isManualEntry: receipt.isManualEntry
+                isManualEntry: receipt.isManualEntry,
+                receiptID: receipt.id,
+                reportID: nil
             )
             activities.append(activity)
         }
@@ -935,7 +937,9 @@ class StorageManager: ObservableObject {
                 currency: nil,
                 date: report.createdAt ?? Date(),
                 thumbnailURL: nil,
-                isManualEntry: false
+                isManualEntry: false,
+                receiptID: nil,
+                reportID: report.id
             )
             activities.append(activity)
         }
@@ -947,14 +951,23 @@ class StorageManager: ObservableObject {
             .map { $0 }
     }
     
-    func getMonthlyStatistics() -> (totalAmount: Double, receiptCount: Int) {
+    func getMonthlyStatistics(currency: String? = nil) -> (totalAmount: Double, receiptCount: Int) {
         let calendar = Calendar.current
         let now = Date()
         let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
         let endOfMonth = calendar.dateInterval(of: .month, for: now)?.end ?? now
         
         let request: NSFetchRequest<Receipt> = Receipt.fetchRequest()
-        request.predicate = NSPredicate(format: "date >= %@ AND date < %@", startOfMonth as NSDate, endOfMonth as NSDate)
+        var predicates: [NSPredicate] = [
+            NSPredicate(format: "date >= %@ AND date < %@", startOfMonth as NSDate, endOfMonth as NSDate)
+        ]
+        
+        // Filter by currency if specified
+        if let currency = currency {
+            predicates.append(NSPredicate(format: "currency == %@", currency))
+        }
+        
+        request.predicate = NSCompoundPredicate(type: .and, subpredicates: predicates)
         
         do {
             let receipts = try persistenceController.container.viewContext.fetch(request)
@@ -975,6 +988,32 @@ class StorageManager: ObservableObject {
         } catch {
             print("Failed to fetch total receipt count: \(error)")
             return 0
+        }
+    }
+    
+    func fetchReceipt(by id: UUID) -> Receipt? {
+        let request: NSFetchRequest<Receipt> = Receipt.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        do {
+            return try persistenceController.container.viewContext.fetch(request).first
+        } catch {
+            print("Failed to fetch receipt by ID: \(error)")
+            return nil
+        }
+    }
+    
+    func fetchReport(by id: UUID) -> Report? {
+        let request: NSFetchRequest<Report> = Report.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        do {
+            return try persistenceController.container.viewContext.fetch(request).first
+        } catch {
+            print("Failed to fetch report by ID: \(error)")
+            return nil
         }
     }
     
@@ -1109,6 +1148,8 @@ struct RecentActivityItem: Identifiable {
     let date: Date
     let thumbnailURL: URL?
     let isManualEntry: Bool
+    let receiptID: UUID?
+    let reportID: UUID?
     
     enum ActivityType {
         case receipt

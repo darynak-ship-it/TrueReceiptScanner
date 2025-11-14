@@ -32,9 +32,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
+            // Always show onboarding if not completed - this ensures users cannot bypass it
             if !hasCompletedOnboarding {
                 OnboardingFlowView(
                     onFinish: { action in
+                        // Ensure onboarding is marked as complete
                         hasCompletedOnboarding = true
                         switch action {
                         case .scanNow:
@@ -106,18 +108,22 @@ struct RootView: View {
             print("Image picker dismissed")
         }) {
             ImagePicker(selectedImage: .constant(nil), onImageSelected: { selectedImage in
-                // Only dismiss if we have an image or explicitly cancelled
-                showImagePicker = false
-                
-                guard let image = selectedImage else {
-                    print("No image selected from gallery")
-                    return
+                // Dismiss picker first
+                DispatchQueue.main.async {
+                    showImagePicker = false
+                    
+                    guard let image = selectedImage else {
+                        print("No image selected from gallery")
+                        return
+                    }
+                    
+                    print("Image selected from gallery: \(image.size)")
+                    // Small delay to ensure picker is dismissed before showing crop view
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        selectedImageForCrop = image
+                        showImageCrop = true
+                    }
                 }
-                
-                print("Image selected from gallery: \(image.size)")
-                // Show crop view instead of processing immediately
-                selectedImageForCrop = image
-                showImageCrop = true
             })
         }
         .sheet(isPresented: $showImageCrop) {
@@ -125,14 +131,19 @@ struct RootView: View {
                 ImageCropView(
                     image: image,
                     onCrop: { croppedImage in
-                        showImageCrop = false
-                        selectedImageForCrop = nil
-                        print("Processing cropped image from gallery: \(croppedImage.size)")
-                        processImageFromGallery(croppedImage)
+                        DispatchQueue.main.async {
+                            showImageCrop = false
+                            selectedImageForCrop = nil
+                            print("Processing cropped image from gallery: \(croppedImage.size)")
+                            // Process the cropped image
+                            processImageFromGallery(croppedImage)
+                        }
                     },
                     onCancel: {
-                        showImageCrop = false
-                        selectedImageForCrop = nil
+                        DispatchQueue.main.async {
+                            showImageCrop = false
+                            selectedImageForCrop = nil
+                        }
                     }
                 )
             }
@@ -233,25 +244,40 @@ struct RootView: View {
         print("Image scale: \(image.scale)")
         
         // Show loading indicator
-        isProcessingOCR = true
+        DispatchQueue.main.async {
+            self.isProcessingOCR = true
+        }
         
         // Process image on background queue (similar to scanner)
-        DispatchQueue.global(qos: .userInitiated).async { [self] in
+        DispatchQueue.global(qos: .userInitiated).async {
             // Apply scanner-like processing first (with timeout fallback)
             print("Applying scanner processing...")
             var processingCompleted = false
+            let lock = NSLock()
             
-            // Set a timeout to ensure we don't wait forever
+            // Set a timeout to ensure we don't wait forever (reduced to 8 seconds)
             let timeoutWorkItem = DispatchWorkItem {
-                if !processingCompleted {
-                    print("Scanner processing timeout, using original image")
-                    processingCompleted = true
-                    self.saveAndProcessImage(image)
+                lock.lock()
+                defer { lock.unlock() }
+                
+                guard !processingCompleted else { return }
+                processingCompleted = true
+                print("Scanner processing timeout, using original image")
+                
+                // Save original image on background queue
+                DispatchQueue.global(qos: .userInitiated).async {
+                    self.saveAndProcessImage(image, originalImage: image)
                 }
             }
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 10.0, execute: timeoutWorkItem)
             
+            // Schedule timeout
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 8.0, execute: timeoutWorkItem)
+            
+            // Start image processing
             ImageProcessor.processScannedImage(from: image) { processedImage in
+                lock.lock()
+                defer { lock.unlock() }
+                
                 guard !processingCompleted else { return }
                 processingCompleted = true
                 timeoutWorkItem.cancel()
@@ -262,15 +288,16 @@ struct RootView: View {
                     if processedImage == nil {
                         print("Scanner processing failed, using original image")
                     } else {
-                        print("Scanner processing completed successfully")
+                        print("Scanner processing completed successfully - image is now black & white scanned-like")
                     }
-                    self.saveAndProcessImage(imageToSave)
+                    // Save the processed image (which is black & white scanned-like)
+                    self.saveAndProcessImage(imageToSave, originalImage: image)
                 }
             }
         }
     }
     
-    private func saveAndProcessImage(_ image: UIImage) {
+    private func saveAndProcessImage(_ image: UIImage, originalImage: UIImage? = nil) {
         // Save image using ZIP compression (like scanner)
         print("Saving image as ZIP...")
         let result = StorageManager.shared.saveReceiptImageAsZip(image, compressionQuality: 0.7)
@@ -337,9 +364,10 @@ struct RootView: View {
             return
         }
         
-        // Perform OCR asynchronously
+        // Perform OCR asynchronously on the processed image (or original if no processing was done)
         print("Starting OCR for gallery image...")
-        OCRTextRecognizer.recognizeText(from: image) { text in
+        let imageForOCR = originalImage ?? image // Use original for OCR as it has better text recognition
+        OCRTextRecognizer.recognizeText(from: imageForOCR) { text in
             print("OCR completed for gallery image")
             DispatchQueue.main.async {
                 print("Setting scannedImageURL to: \(url.path)")

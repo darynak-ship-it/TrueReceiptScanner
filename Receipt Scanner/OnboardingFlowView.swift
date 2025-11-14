@@ -17,6 +17,7 @@ struct OnboardingFlowView: View {
     let onRequestScan: () -> Void
     let onRequestSample: () -> Void
 
+    @AppStorage("onboardingStep") private var savedStep: Int = 1
     @State private var step: Int = 1 // 1...4
 
     var body: some View {
@@ -90,6 +91,14 @@ struct OnboardingFlowView: View {
             }
             .ignoresSafeArea(edges: .bottom)
         }
+        .onAppear {
+            // Restore saved step when view appears
+            step = savedStep
+        }
+        .onChange(of: step) { newStep in
+            // Save step whenever it changes
+            savedStep = newStep
+        }
     }
 
     private var imageView: Image {
@@ -128,6 +137,10 @@ struct OnboardingFlowView: View {
             if step < 4 {
                 step += 1
             } else {
+                // Mark onboarding as complete before finishing
+                UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                // Clear saved step
+                UserDefaults.standard.removeObject(forKey: "onboardingStep")
                 onFinish(.scanNow)
                 onRequestScan()
             }
@@ -144,6 +157,10 @@ struct OnboardingFlowView: View {
 
     private var secondaryButton: some View {
         Button(action: {
+            // Mark onboarding as complete before finishing
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+            // Clear saved step
+            UserDefaults.standard.removeObject(forKey: "onboardingStep")
             onFinish(.useSample)
             onRequestSample()
         }) {

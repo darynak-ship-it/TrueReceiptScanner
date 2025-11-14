@@ -18,6 +18,38 @@ enum OCRTextRecognizer {
             return
         }
         
+        // Downscale very large images for OCR to prevent freezing
+        // OCR works well on 2048px images while being much faster than 4000px+
+        let maxDimension: CGFloat = 2048
+        let imageSize = image.size
+        let imageForOCR: CGImage
+        
+        if max(imageSize.width, imageSize.height) > maxDimension {
+            // Downscale the image
+            let scale: CGFloat
+            if imageSize.width > imageSize.height {
+                scale = maxDimension / imageSize.width
+            } else {
+                scale = maxDimension / imageSize.height
+            }
+            
+            let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: scaledSize)
+            let downscaledImage = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: scaledSize))
+            }
+            
+            if let downscaledCGImage = downscaledImage.cgImage {
+                imageForOCR = downscaledCGImage
+                print("Downscaled image from \(imageSize) to \(scaledSize) for OCR")
+            } else {
+                // Fallback to original if downscaling fails
+                imageForOCR = cgImage
+            }
+        } else {
+            imageForOCR = cgImage
+        }
+        
         let request = VNRecognizeTextRequest { request, error in
             if let error = error {
                 print("OCR Error: \(error.localizedDescription)")
@@ -49,7 +81,7 @@ enum OCRTextRecognizer {
             request.automaticallyDetectsLanguage = true
         }
 
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        let handler = VNImageRequestHandler(cgImage: imageForOCR, options: [:])
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try handler.perform([request])

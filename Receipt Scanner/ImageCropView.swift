@@ -96,92 +96,170 @@ struct ImageCropView: View {
     
     private func detectReceiptArea() {
         guard let cgImage = image.cgImage else {
-            setupDefaultCropRect()
+            DispatchQueue.main.async {
+                setupDefaultCropRect()
+            }
             return
         }
         
-        isDetecting = true
-        
-        let request = VNDetectRectanglesRequest { request, error in
-            DispatchQueue.main.async {
-                isDetecting = false
-                
-                if let error = error {
-                    print("Error detecting receipt: \(error.localizedDescription)")
-                    setupDefaultCropRect()
-                    return
-                }
-                
-                guard let results = request.results as? [VNRectangleObservation],
-                      let rectangle = results.first,
-                      rectangle.confidence > 0.7 else {
-                    print("No receipt detected, using default crop")
-                    setupDefaultCropRect()
-                    return
-                }
-                
-                // Convert Vision coordinates to image coordinates
-                // Vision uses normalized coordinates (0-1) with origin at bottom-left
-                // UIImage uses origin at top-left
-                let imageWidth = image.size.width
-                let imageHeight = image.size.height
-                
-                // Convert normalized coordinates to image coordinates
-                let topLeft = CGPoint(
-                    x: rectangle.topLeft.x * imageWidth,
-                    y: (1 - rectangle.topLeft.y) * imageHeight
-                )
-                let topRight = CGPoint(
-                    x: rectangle.topRight.x * imageWidth,
-                    y: (1 - rectangle.topRight.y) * imageHeight
-                )
-                let bottomLeft = CGPoint(
-                    x: rectangle.bottomLeft.x * imageWidth,
-                    y: (1 - rectangle.bottomLeft.y) * imageHeight
-                )
-                let bottomRight = CGPoint(
-                    x: rectangle.bottomRight.x * imageWidth,
-                    y: (1 - rectangle.bottomRight.y) * imageHeight
-                )
-                
-                // Calculate bounding rect
-                let minX = min(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x)
-                let maxX = max(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x)
-                let minY = min(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)
-                let maxY = max(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)
-                
-                // Add small padding (5% on each side)
-                let paddingX = (maxX - minX) * 0.05
-                let paddingY = (maxY - minY) * 0.05
-                
-                cropRect = CGRect(
-                    x: max(0, minX - paddingX),
-                    y: max(0, minY - paddingY),
-                    width: min(imageWidth - (minX - paddingX), maxX - minX + (paddingX * 2)),
-                    height: min(imageHeight - (minY - paddingY), maxY - minY + (paddingY * 2))
-                )
-                
-                print("Detected receipt area: \(cropRect) with confidence: \(rectangle.confidence)")
-            }
+        DispatchQueue.main.async {
+            isDetecting = true
         }
         
-        request.minimumAspectRatio = 0.2
-        request.maximumAspectRatio = 1.0
-        request.minimumSize = 0.2
-        request.minimumConfidence = 0.6
+        var requestCompleted = false
+        let lock = NSLock()
         
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        // Store original size for coordinate conversion
+        let originalSize = image.size
+        
+        // Downscale image for faster Vision processing (max 1024px on longest side)
+        // This prevents freezing on large images like 4032x3024
+        let maxDimension: CGFloat = 1024
+        
         DispatchQueue.global(qos: .userInitiated).async {
+            // Calculate scale and create downscaled image on background thread
+            let scale: CGFloat
+            if originalSize.width > originalSize.height {
+                scale = originalSize.width > maxDimension ? maxDimension / originalSize.width : 1.0
+            } else {
+                scale = originalSize.height > maxDimension ? maxDimension / originalSize.height : 1.0
+            }
+            
+            let scaledSize = CGSize(width: originalSize.width * scale, height: originalSize.height * scale)
+            
+            // Create downscaled image for Vision processing
+            guard let downscaledCGImage = self.createDownscaledImage(cgImage: cgImage, targetSize: scaledSize) else {
+                DispatchQueue.main.async {
+                    self.isDetecting = false
+                    print("Failed to downscale image, using default crop")
+                    self.setupDefaultCropRect()
+                }
+                return
+            }
+            
+            print("Downscaled image from \(originalSize) to \(scaledSize) for Vision detection")
+            
+            let request = VNDetectRectanglesRequest { request, error in
+                lock.lock()
+                defer { lock.unlock() }
+                
+                guard !requestCompleted else { return }
+                requestCompleted = true
+                
+                DispatchQueue.main.async {
+                    self.isDetecting = false
+                    
+                    if let error = error {
+                        print("Error detecting receipt: \(error.localizedDescription)")
+                        self.setupDefaultCropRect()
+                        return
+                    }
+                    
+                    guard let results = request.results as? [VNRectangleObservation],
+                          let rectangle = results.first,
+                          rectangle.confidence > 0.6 else {
+                        print("No receipt detected, using default crop")
+                        self.setupDefaultCropRect()
+                        return
+                    }
+                    
+                    // Convert Vision coordinates to original image coordinates
+                    // Vision uses normalized coordinates (0-1) with origin at bottom-left
+                    // UIImage uses origin at top-left
+                    // Scale coordinates back to original image size
+                    let imageWidth = originalSize.width
+                    let imageHeight = originalSize.height
+                    
+                    // Convert normalized coordinates to scaled image coordinates, then scale up
+                    let topLeft = CGPoint(
+                        x: rectangle.topLeft.x * imageWidth,
+                        y: (1 - rectangle.topLeft.y) * imageHeight
+                    )
+                    let topRight = CGPoint(
+                        x: rectangle.topRight.x * imageWidth,
+                        y: (1 - rectangle.topRight.y) * imageHeight
+                    )
+                    let bottomLeft = CGPoint(
+                        x: rectangle.bottomLeft.x * imageWidth,
+                        y: (1 - rectangle.bottomLeft.y) * imageHeight
+                    )
+                    let bottomRight = CGPoint(
+                        x: rectangle.bottomRight.x * imageWidth,
+                        y: (1 - rectangle.bottomRight.y) * imageHeight
+                    )
+                    
+                    // Calculate bounding rect
+                    let minX = min(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x)
+                    let maxX = max(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x)
+                    let minY = min(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)
+                    let maxY = max(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)
+                    
+                    // Add small padding (5% on each side)
+                    let paddingX = (maxX - minX) * 0.05
+                    let paddingY = (maxY - minY) * 0.05
+                    
+                    self.cropRect = CGRect(
+                        x: max(0, minX - paddingX),
+                        y: max(0, minY - paddingY),
+                        width: min(imageWidth - (minX - paddingX), maxX - minX + (paddingX * 2)),
+                        height: min(imageHeight - (minY - paddingY), maxY - minY + (paddingY * 2))
+                    )
+                    
+                    print("Detected receipt area: \(self.cropRect) with confidence: \(rectangle.confidence)")
+                }
+            }
+            
+            request.minimumAspectRatio = 0.2
+            request.maximumAspectRatio = 1.0
+            request.minimumSize = 0.2
+            request.minimumConfidence = 0.6
+            
+            let handler = VNImageRequestHandler(cgImage: downscaledCGImage, options: [:])
+            
+            // Add timeout to prevent hanging
+            let timeoutWorkItem = DispatchWorkItem {
+                lock.lock()
+                defer { lock.unlock() }
+                
+                guard !requestCompleted else { return }
+                requestCompleted = true
+                
+                DispatchQueue.main.async {
+                    self.isDetecting = false
+                    print("Receipt detection timed out, using default crop")
+                    self.setupDefaultCropRect()
+                }
+            }
+            
+            // Schedule timeout (3 seconds max for detection - reduced since we're using smaller image)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3.0, execute: timeoutWorkItem)
+            
             do {
                 try handler.perform([request])
             } catch {
+                lock.lock()
+                defer { lock.unlock() }
+                
+                guard !requestCompleted else { return }
+                requestCompleted = true
+                timeoutWorkItem.cancel()
+                
                 DispatchQueue.main.async {
-                    isDetecting = false
+                    self.isDetecting = false
                     print("Failed to detect receipt: \(error)")
-                    setupDefaultCropRect()
+                    self.setupDefaultCropRect()
                 }
             }
         }
+    }
+    
+    private func createDownscaledImage(cgImage: CGImage, targetSize: CGSize) -> CGImage? {
+        // Use UIGraphicsImageRenderer for efficient downscaling
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let downscaledImage = renderer.image { _ in
+            UIImage(cgImage: cgImage).draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        return downscaledImage.cgImage
     }
     
     private func setupDefaultCropRect() {
@@ -454,4 +532,5 @@ struct CropHandleView: View {
             .shadow(radius: 2)
     }
 }
+
 

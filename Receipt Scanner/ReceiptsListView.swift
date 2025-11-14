@@ -191,39 +191,6 @@ struct ReceiptRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Receipt thumbnail
-            if let thumbnailURL = receipt.thumbnailURL {
-                AsyncImage(url: thumbnailURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.3))
-                }
-                .frame(width: 60, height: 60)
-                .cornerRadius(8)
-            } else if let imageURL = receipt.imageURL {
-                AsyncImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.3))
-                }
-                .frame(width: 60, height: 60)
-                .cornerRadius(8)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Image(systemName: receipt.isManualEntry ? "pencil" : "doc.text")
-                            .foregroundColor(.gray)
-                    )
-            }
-            
             // Receipt details
             VStack(alignment: .leading, spacing: 4) {
                 Text(receipt.merchantName ?? "Unknown Merchant")
