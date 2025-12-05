@@ -1,0 +1,128 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/ReportPreviewView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Preview",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generate",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date range:",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 100
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipts attached:",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 107
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 109
+        }
+      },
+      {
+        "comment": "",
+        "key": "Expenses",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category Summary",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 161
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipts",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 194
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt %lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 206
+        }
+      },
+      {
+        "comment": "",
+        "key": "No receipt image",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt %lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 376
+        }
+      },
+      {
+        "comment": "",
+        "key": "No receipt image available",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 367
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 380
+        }
+      }
+    ]
+  },
+  "version": 1
+}

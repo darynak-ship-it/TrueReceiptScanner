@@ -1,0 +1,30 @@
+{
+  "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/ReportPreviewView.swift" : {
+    "const-values" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportPreviewView.swiftconstvalues",
+    "dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportPreviewView.d",
+    "diagnostics" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportPreviewView.dia",
+    "object" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportPreviewView.o",
+    "swift-dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportPreviewView.swiftdeps"
+  },
+  "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/ReportsListView.swift" : {
+    "const-values" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportsListView.swiftconstvalues",
+    "dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportsListView.d",
+    "diagnostics" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportsListView.dia",
+    "object" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportsListView.o",
+    "swift-dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/ReportsListView.swiftdeps"
+  },
+  "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/RootView.swift" : {
+    "const-values" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/RootView.swiftconstvalues",
+    "dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/RootView.d",
+    "diagnostics" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/RootView.dia",
+    "object" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/RootView.o",
+    "swift-dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/RootView.swiftdeps"
+  },
+  "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/SampleReceiptGenerator.swift" : {
+    "const-values" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/SampleReceiptGenerator.swiftconstvalues",
+    "dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/SampleReceiptGenerator.d",
+    "diagnostics" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/SampleReceiptGenerator.dia",
+    "object" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/SampleReceiptGenerator.o",
+    "swift-dependencies" : "/Users/darynakalnichenko/Documents/Receipt Scanner/DerivedData/Build/Intermediates.noindex/Receipt Scanner.build/Debug-iphonesimulator/Receipt Scanner.build/Objects-normal/x86_64/SampleReceiptGenerator.swiftdeps"
+  }
+}

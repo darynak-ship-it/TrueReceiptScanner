@@ -36,42 +36,83 @@ struct ImagePicker: UIViewControllerRepresentable {
     
     class Coordinator: NSObject, PHPickerViewControllerDelegate {
         let parent: ImagePicker
+        private var hasProcessedSelection = false
         
         init(_ parent: ImagePicker) {
             self.parent = parent
         }
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            // Dismiss the picker
-            picker.dismiss(animated: true)
+            // Prevent duplicate processing
+            guard !hasProcessedSelection else {
+                print("ImagePicker: Already processed selection, ignoring duplicate callback")
+                return
+            }
+            hasProcessedSelection = true
+            
+            // Dismiss the picker immediately
+            picker.dismiss(animated: true, completion: nil)
             
             // Check if user cancelled (no selection)
             guard !results.isEmpty, let provider = results.first?.itemProvider else {
+                // Call callback immediately after dismissal
                 DispatchQueue.main.async {
                     self.parent.onImageSelected?(nil)
                 }
                 return
             }
             
-            // Load the image
+            // Load the image on background queue to prevent blocking
             if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, error in
-                    DispatchQueue.main.async {
+                // Load image on background queue to prevent UI blocking
+                DispatchQueue.global(qos: .userInitiated).async {
+                    provider.loadObject(ofClass: UIImage.self) { image, error in
                         if let error = error {
                             print("Error loading image: \(error.localizedDescription)")
-                            self.parent.onImageSelected?(nil)
+                            DispatchQueue.main.async {
+                                self.parent.onImageSelected?(nil)
+                            }
                             return
                         }
                         
                         guard let selectedImage = image as? UIImage else {
                             print("Failed to cast image to UIImage")
-                            self.parent.onImageSelected?(nil)
+                            DispatchQueue.main.async {
+                                self.parent.onImageSelected?(nil)
+                            }
                             return
                         }
                         
                         print("Successfully loaded image from gallery: \(selectedImage.size)")
-                        self.parent.selectedImage = selectedImage
-                        self.parent.onImageSelected?(selectedImage)
+                        
+                        // Downscale very large images immediately to prevent memory issues
+                        let maxDimension: CGFloat = 2048
+                        let imageSize = selectedImage.size
+                        let finalImage: UIImage
+                        
+                        if max(imageSize.width, imageSize.height) > maxDimension {
+                            let scale: CGFloat
+                            if imageSize.width > imageSize.height {
+                                scale = maxDimension / imageSize.width
+                            } else {
+                                scale = maxDimension / imageSize.height
+                            }
+                            
+                            let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+                            let renderer = UIGraphicsImageRenderer(size: scaledSize)
+                            finalImage = renderer.image { _ in
+                                selectedImage.draw(in: CGRect(origin: .zero, size: scaledSize))
+                            }
+                            print("Downscaled image from \(imageSize) to \(scaledSize) for processing")
+                        } else {
+                            finalImage = selectedImage
+                        }
+                        
+                        // Update on main thread immediately
+                        DispatchQueue.main.async {
+                            self.parent.selectedImage = finalImage
+                            self.parent.onImageSelected?(finalImage)
+                        }
                     }
                 }
             } else {

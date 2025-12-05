@@ -1,0 +1,408 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/ManualExpenseView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Manual Entry",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 339
+        }
+      },
+      {
+        "comment": "",
+        "key": "Saved",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 377
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 380
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt Image (Optional)",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap to view full size",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 138
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove Image",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Replace Image",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 156
+        }
+      },
+      {
+        "comment": "",
+        "key": "Attach Receipt Image",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 169
+        }
+      },
+      {
+        "comment": "",
+        "key": "Optional - helps with record keeping",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 173
+        }
+      },
+      {
+        "comment": "",
+        "key": "Merchant Name",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 191
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter merchant name",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 193
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 201
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select date",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 211
+        }
+      },
+      {
+        "comment": "",
+        "key": "0.00",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 214
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Method",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 255
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tax Deductible",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 275
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 278
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tag",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 284
+        }
+      },
+      {
+        "comment": "",
+        "key": "#work, #meal, #projectX",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 288
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 292
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notes",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 302
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add notes",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 306
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 322
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 343
+        }
+      },
+      {
+        "comment": "",
+        "key": "#",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 349
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 364
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 378
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 381
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 399
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 403
+        }
+      },
+      {
+        "comment": "",
+        "key": "Currency",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 562
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 565
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 569
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 636
+        }
+      },
+      {
+        "comment": "",
+        "key": "SELECT CATEGORY",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 611
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create new category",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 630
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 639
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 643
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Category",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 657
+        }
+      },
+      {
+        "comment": "",
+        "key": "Emoji",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 650
+        }
+      },
+      {
+        "comment": "",
+        "key": "Name",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 653
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter emoji",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 651
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category name",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 654
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 660
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 664
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Method",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 713
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 716
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 720
+        }
+      }
+    ]
+  },
+  "version": 1
+}

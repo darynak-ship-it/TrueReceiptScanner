@@ -1,0 +1,88 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/ReceiptsListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Receipts",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 88
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sort",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 51
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 92
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search receipts...",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tax Deductible",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 242
+        }
+      },
+      {
+        "comment": "",
+        "key": "Manual",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 251
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 269
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Receipts Found",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 297
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start by scanning your first receipt or add one manually.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 300
+        }
+      }
+    ]
+  },
+  "version": 1
+}

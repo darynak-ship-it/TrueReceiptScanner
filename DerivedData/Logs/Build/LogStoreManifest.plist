@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logFormatVersion</key>
+	<integer>11</integer>
+	<key>logs</key>
+	<dict>
+		<key>65C47F44-F48A-4C99-96E0-02BB8510B5C4</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>65C47F44-F48A-4C99-96E0-02BB8510B5C4.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Receipt Scanner project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Receipt Scanner</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project Receipt Scanner with scheme Receipt Scanner</string>
+			<key>timeStartedRecording</key>
+			<real>784653743.25511503</real>
+			<key>timeStoppedRecording</key>
+			<real>784653748.79907596</real>
+			<key>title</key>
+			<string>Building project Receipt Scanner with scheme Receipt Scanner</string>
+			<key>uniqueIdentifier</key>
+			<string>65C47F44-F48A-4C99-96E0-02BB8510B5C4</string>
+		</dict>
+		<key>DF2F969E-3DE4-4A9C-9E5D-67F36ECFCC40</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>DF2F969E-3DE4-4A9C-9E5D-67F36ECFCC40.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Receipt Scanner project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Receipt Scanner</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project Receipt Scanner with scheme Receipt Scanner</string>
+			<key>timeStartedRecording</key>
+			<real>784655808.14293504</real>
+			<key>timeStoppedRecording</key>
+			<real>784655863.75409901</real>
+			<key>title</key>
+			<string>Building project Receipt Scanner with scheme Receipt Scanner</string>
+			<key>uniqueIdentifier</key>
+			<string>DF2F969E-3DE4-4A9C-9E5D-67F36ECFCC40</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

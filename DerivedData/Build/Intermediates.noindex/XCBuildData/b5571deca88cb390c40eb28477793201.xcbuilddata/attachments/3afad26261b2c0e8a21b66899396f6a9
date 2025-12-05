@@ -1,0 +1,30 @@
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/CreateReportView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/DashboardView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/EditExpenseView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/EditManualExpenseView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/EditReceiptView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/FileStorage.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ImageCropView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ImagePicker.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ImageProcessor.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ManualExpenseView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/OCRTextRecognizer.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/OnboardingFlowView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/Persistence.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/Receipt_ScannerApp.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ReceiptsListView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ReportGenerator.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ReportPreviewView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ReportsListView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/RootView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/SampleReceiptGenerator.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ScannerContainer.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/SettingsView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/SupportView.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/Receipt\ Scanner/ThemeManager.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/DerivedData/Build/Intermediates.noindex/Receipt\ Scanner.build/Debug-iphonesimulator/Receipt\ Scanner.build/DerivedSources/CoreDataGenerated/Receipt_Scanner/Receipt+CoreDataClass.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/DerivedData/Build/Intermediates.noindex/Receipt\ Scanner.build/Debug-iphonesimulator/Receipt\ Scanner.build/DerivedSources/CoreDataGenerated/Receipt_Scanner/Receipt+CoreDataProperties.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/DerivedData/Build/Intermediates.noindex/Receipt\ Scanner.build/Debug-iphonesimulator/Receipt\ Scanner.build/DerivedSources/CoreDataGenerated/Receipt_Scanner/Report+CoreDataClass.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/DerivedData/Build/Intermediates.noindex/Receipt\ Scanner.build/Debug-iphonesimulator/Receipt\ Scanner.build/DerivedSources/CoreDataGenerated/Receipt_Scanner/Report+CoreDataProperties.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/DerivedData/Build/Intermediates.noindex/Receipt\ Scanner.build/Debug-iphonesimulator/Receipt\ Scanner.build/DerivedSources/CoreDataGenerated/Receipt_Scanner/Receipt_Scanner+CoreDataModel.swift
+/Users/darynakalnichenko/Documents/Receipt\ Scanner/DerivedData/Build/Intermediates.noindex/Receipt\ Scanner.build/Debug-iphonesimulator/Receipt\ Scanner.build/DerivedSources/GeneratedAssetSymbols.swift

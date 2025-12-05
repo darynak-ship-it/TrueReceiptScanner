@@ -57,7 +57,6 @@ struct EditManualExpenseView: View {
     @State private var showReceiptViewer: Bool = false
     
     // Sheet toggles
-    @State private var showCurrencySheet: Bool = false
     @State private var showCategorySheet: Bool = false
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
@@ -102,6 +101,17 @@ struct EditManualExpenseView: View {
         Category(name: "Relocation expenses", emoji: "📦"),
         Category(name: "Client-related expenses", emoji: "🤝"),
         Category(name: "Other", emoji: "🗂️")
+    ]
+    
+    private let methods: [PaymentMethod] = [
+        PaymentMethod(name: "Credit Card", emoji: "💳"),
+        PaymentMethod(name: "Debit Card", emoji: "🤑"),
+        PaymentMethod(name: "PayPal", emoji: "🔹"),
+        PaymentMethod(name: "Apple Pay/Google Pay", emoji: "🤳"),
+        PaymentMethod(name: "Bank Transfer", emoji: "⏩"),
+        PaymentMethod(name: "Cash", emoji: "💸"),
+        PaymentMethod(name: "Prepaid Cards", emoji: "🎁"),
+        PaymentMethod(name: "Other", emoji: "❓")
     ]
     
     var body: some View {
@@ -174,13 +184,15 @@ struct EditManualExpenseView: View {
                 }
                 .padding(.horizontal, 16)
                 
-                // Single gray pad with all editable fields
+                // Editable fields container
                 VStack(alignment: .leading, spacing: 16) {
-                    // Field 1 - Merchant Name (white rounded field with example)
+                    // Field 1 - Merchant Name
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Merchant Name")
                             .font(.headline)
                         TextField("Enter merchant name", text: $merchantName)
+                            .textFieldStyle(.plain)
+                            .foregroundColor(.primary)
                             .padding(12)
                             .background(themeManager.textFieldBackgroundColor)
                             .cornerRadius(8)
@@ -196,57 +208,70 @@ struct EditManualExpenseView: View {
                             .labelsHidden()
                     }
                     
-                    // Field 3 - Total + Currency (white rounded field with example)
+                    // Field 3 - Total + Currency
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Total")
                             .font(.headline)
                         HStack(spacing: 12) {
                             TextField("0.00", text: $totalAmountText)
                                 .keyboardType(.decimalPad)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.primary)
                                 .padding(12)
                                 .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
-                            Button(action: { showCurrencySheet = true }) {
-                                HStack(spacing: 6) {
-                                    Text(selectedCurrency.flag)
-                                    Text(selectedCurrency.code)
-                                        .foregroundColor(.accentColor)
+                            Menu {
+                                ForEach(currencies, id: \.id) { currency in
+                                    Button(action: { selectedCurrency = currency }) {
+                                        Label("\(currency.flag) \(currency.code)", systemImage: selectedCurrency == currency ? "checkmark.circle.fill" : "circle")
+                                    }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
+                            } label: {
+                                FilterMenuLabel(
+                                    title: "\(selectedCurrency.flag) \(selectedCurrency.code)",
+                                    count: 0
+                                )
                             }
                         }
                     }
                     
-                    // Field 4 - Category (single-line label + preview)
-                    HStack {
+                    // Field 4 - Category (Menu-based selection)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Category")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showCategorySheet = true }) {
-                            HStack(spacing: 8) {
-                                Text(selectedCategory.emoji)
-                                Text(selectedCategory.name)
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Menu {
+                            ForEach(categories, id: \.id) { category in
+                                Button(action: { selectedCategory = category }) {
+                                    Label(category.name, systemImage: selectedCategory == category ? "checkmark.circle.fill" : "circle")
+                                }
                             }
+                        } label: {
+                            FilterMenuLabel(
+                                title: "\(selectedCategory.emoji) \(selectedCategory.name)",
+                                count: 0
+                            )
                         }
                     }
                     
-                    // Field 5 - Payment Method
-                    HStack {
+                    // Field 5 - Payment Method (Menu-based selection)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Payment Method")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showPaymentSheet = true }) {
-                            HStack(spacing: 8) {
-                                Text(selectedPayment.emoji)
-                                Text(selectedPayment.name)
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Menu {
+                            ForEach(methods, id: \.id) { method in
+                                Button(action: { selectedPayment = method }) {
+                                    Label(method.name, systemImage: selectedPayment == method ? "checkmark.circle.fill" : "circle")
+                                }
                             }
+                        } label: {
+                            FilterMenuLabel(
+                                title: "\(selectedPayment.emoji) \(selectedPayment.name)",
+                                count: 0
+                            )
                         }
                     }
                     
@@ -259,7 +284,7 @@ struct EditManualExpenseView: View {
                             .labelsHidden()
                     }
                     
-                    // Field 7 - Tag (white rounded field with example)
+                    // Field 7 - Tag
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tag")
                             .font(.headline)
@@ -270,13 +295,15 @@ struct EditManualExpenseView: View {
                                     .padding(.leading, 12)
                             }
                             TextField("", text: $tagsText)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.primary)
                                 .padding(12)
                         }
                         .background(themeManager.textFieldBackgroundColor)
                         .cornerRadius(8)
                     }
                     
-                    // Field 8 - Notes (white rounded field with example)
+                    // Field 8 - Notes
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes")
                             .font(.headline)
@@ -288,6 +315,7 @@ struct EditManualExpenseView: View {
                                     .padding(.leading, 12)
                             }
                             TextEditor(text: $notes)
+                                .foregroundColor(.primary)
                                 .frame(minHeight: 120)
                                 .padding(4)
                                 .scrollContentBackground(.hidden)
@@ -308,9 +336,6 @@ struct EditManualExpenseView: View {
                     }
                     .padding(.top, 8)
                 }
-                .padding(16)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(16)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
@@ -325,9 +350,6 @@ struct EditManualExpenseView: View {
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(selectedImage: $attachedImage)
-        }
-        .sheet(isPresented: $showCurrencySheet) {
-            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
         }
         .sheet(isPresented: $showCategorySheet) {
             CategoryPickerView(selected: $selectedCategory, isPresented: $showCategorySheet, themeManager: themeManager)

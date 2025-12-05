@@ -1,0 +1,56 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/RootView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Camera Permission Required",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 193
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 194
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 199
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please enable camera access in Settings to scan receipts.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 201
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scanning Receipt...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 396
+        }
+      },
+      {
+        "comment": "",
+        "key": "Extracting text from image",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 400
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,296 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/CreateReportView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Create Report",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report Generated",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 106
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 114
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create Report",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 203
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filter expenses, select receipts, and choose a format.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report Format",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filters & Sorting",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 258
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filters & Sorting",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 288
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 305
+        }
+      },
+      {
+        "comment": "",
+        "key": "Including receipts from all time.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 318
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date Filter",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 309
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 324
+        }
+      },
+      {
+        "comment": "",
+        "key": "End",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "No options available yet.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 372
+        }
+      },
+      {
+        "comment": "",
+        "key": "No %@ available yet.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 439
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Selection",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 452
+        }
+      },
+      {
+        "comment": "",
+        "key": "Only tax-deductible receipts",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 473
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sort",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 481
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sort receipts",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 486
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select Receipts",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 515
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld receipt%@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 521
+        }
+      },
+      {
+        "comment": "",
+        "key": "Deselect All",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 526
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select All",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 526
+        }
+      },
+      {
+        "comment": "",
+        "key": "Preview Report",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 578
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generating...",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 604
+        }
+      },
+      {
+        "comment": "",
+        "key": "Generate Report",
+        "location": {
+          "startingColumn": 67,
+          "startingLine": 604
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1176
+        }
+      },
+      {
+        "comment": "",
+        "key": "No receipts match your filters",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 1205
+        }
+      },
+      {
+        "comment": "",
+        "key": "No receipts to display",
+        "location": {
+          "startingColumn": 67,
+          "startingLine": 1205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try adjusting the filters or resetting them to see more receipts.",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 1208
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add receipts to start building your report.",
+        "location": {
+          "startingColumn": 102,
+          "startingLine": 1208
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ %@",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1279
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Receipts Available",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1294
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add some receipts first to create a report.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1297
+        }
+      }
+    ]
+  },
+  "version": 1
+}

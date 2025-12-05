@@ -1,0 +1,392 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/EditExpenseView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Edit Expense",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 309
+        }
+      },
+      {
+        "comment": "",
+        "key": "Saved",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 354
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 357
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt preview. Tap to view full size.",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 138
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt image unavailable",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Image URL: %@",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Merchant Name",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 161
+        }
+      },
+      {
+        "comment": "",
+        "key": "Item 1: Sample Item",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 171
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select date",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 174
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "0.0",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Method",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 225
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tax Deductible",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 245
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 248
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tag",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 254
+        }
+      },
+      {
+        "comment": "",
+        "key": "#work, #meal, #projectX",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 258
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 262
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notes",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 272
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add notes",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 276
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 292
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 313
+        }
+      },
+      {
+        "comment": "",
+        "key": "#",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 319
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 334
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 355
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 358
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receipt",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 380
+        }
+      },
+      {
+        "comment": "",
+        "key": "No receipt available",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 376
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 384
+        }
+      },
+      {
+        "comment": "",
+        "key": "Currency",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 929
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 932
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 936
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 1003
+        }
+      },
+      {
+        "comment": "",
+        "key": "SELECT CATEGORY",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 978
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create new category",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 997
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1006
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1010
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Category",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 1024
+        }
+      },
+      {
+        "comment": "",
+        "key": "Emoji",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 1017
+        }
+      },
+      {
+        "comment": "",
+        "key": "Name",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 1020
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter emoji",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 1018
+        }
+      },
+      {
+        "comment": "",
+        "key": "Category name",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 1021
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 1027
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 1031
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Method",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 1080
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1083
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1087
+        }
+      }
+    ]
+  },
+  "version": 1
+}

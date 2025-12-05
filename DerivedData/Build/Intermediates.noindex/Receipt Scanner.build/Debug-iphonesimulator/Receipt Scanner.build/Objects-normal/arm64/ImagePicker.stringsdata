@@ -1,0 +1,16 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/ImagePicker.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Choose from Gallery",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 92
+        }
+      }
+    ]
+  },
+  "version": 1
+}

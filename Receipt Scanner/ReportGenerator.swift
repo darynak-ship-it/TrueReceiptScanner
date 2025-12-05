@@ -26,7 +26,10 @@ struct ReportGenerator {
         let title = reportNumber ?? "Receipt Report"
         var renderedImage: UIImage?
 
-        let renderBlock = {
+        // Always perform rendering on main thread, but use async to prevent deadlocks
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        DispatchQueue.main.async {
             let exportView = ReportLayoutView(
                 receipts: receipts,
                 reportNumber: title,
@@ -43,12 +46,14 @@ struct ReportGenerator {
             renderer.proposedSize = ProposedViewSize(width: 612, height: nil)
             renderer.scale = UIScreen.main.scale
             renderedImage = renderer.uiImage
+            semaphore.signal()
         }
-
-        if Thread.isMainThread {
-            renderBlock()
-        } else {
-            DispatchQueue.main.sync(execute: renderBlock)
+        
+        // Wait for rendering with timeout to prevent infinite blocking
+        let timeout = DispatchTime.now() + .seconds(30)
+        if semaphore.wait(timeout: timeout) == .timedOut {
+            print("PDF rendering timed out")
+            return nil
         }
 
         guard let image = renderedImage else { return nil }

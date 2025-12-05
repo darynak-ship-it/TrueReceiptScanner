@@ -56,7 +56,6 @@ struct EditExpenseView: View {
     @FocusState private var isTagFieldFocused: Bool
 
     // Sheet toggles
-    @State private var showCurrencySheet: Bool = false
     @State private var showCategorySheet: Bool = false
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
@@ -154,9 +153,9 @@ struct EditExpenseView: View {
                     }
                 }
 
-                // Single gray pad with all editable fields
+                // Editable fields container
                 VStack(alignment: .leading, spacing: 16) {
-                    // Field 1 - Merchant Name (white rounded field with example)
+                    // Field 1 - Merchant Name
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Merchant Name")
                             .font(.headline)
@@ -178,7 +177,7 @@ struct EditExpenseView: View {
                             .labelsHidden()
                     }
 
-                    // Field 3 - Total + Currency (white rounded field with example)
+                    // Field 3 - Total + Currency
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Total")
                             .font(.headline)
@@ -190,16 +189,17 @@ struct EditExpenseView: View {
                                 .padding(12)
                                 .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
-                            Button(action: { showCurrencySheet = true }) {
-                                HStack(spacing: 6) {
-                                    Text(selectedCurrency.flag)
-                                    Text(selectedCurrency.code)
-                                        .foregroundColor(.accentColor)
+                            Menu {
+                                ForEach(currencies, id: \.id) { currency in
+                                    Button(action: { selectedCurrency = currency }) {
+                                        Label("\(currency.flag) \(currency.code)", systemImage: selectedCurrency == currency ? "checkmark.circle.fill" : "circle")
+                                    }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
+                            } label: {
+                                FilterMenuLabel(
+                                    title: "\(selectedCurrency.flag) \(selectedCurrency.code)",
+                                    count: 0
+                                )
                             }
                         }
                     }
@@ -253,7 +253,7 @@ struct EditExpenseView: View {
                             .labelsHidden()
                     }
 
-                    // Field 7 - Tag (white rounded field with example)
+                    // Field 7 - Tag
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tag")
                             .font(.headline)
@@ -273,7 +273,7 @@ struct EditExpenseView: View {
                         .cornerRadius(8)
                     }
 
-                    // Field 8 - Notes (white rounded field with example)
+                    // Field 8 - Notes
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes")
                             .font(.headline)
@@ -306,9 +306,6 @@ struct EditExpenseView: View {
                     }
                     .padding(.top, 8)
                 }
-                .padding(16)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(16)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
@@ -354,9 +351,6 @@ struct EditExpenseView: View {
             if let defaultCategoryObj = categories.first(where: { $0.name == defaultCategory }) {
                 selectedCategory = defaultCategoryObj
             }
-        }
-        .sheet(isPresented: $showCurrencySheet) {
-            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }
@@ -714,39 +708,104 @@ struct EditExpenseView: View {
             }
         }
         
-        // Enhanced amount patterns - handle commas, spaces, various formats
-        let amountPatterns = [
-            // Total with currency symbol before: $12.34, $1,234.56, $ 12.34
-            "(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)",
-            // Total with currency symbol after: 12.34 USD, 1,234.56 EUR
-            "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)\\s*(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD)",
-            // Total with label: Total: $12.34, Amount: 45.67, Sum: 123.45
-            "(?i)(?:Total|Amount|Sum|Subtotal|Grand Total|Balance|Due|Paid|Charge)[:\\s]*(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)?\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)",
-            // Just amounts that look like totals (larger numbers, often at end of receipt)
-            "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)\\s*(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD)?"
-        ]
+        // Split text into lines for line-by-line analysis
+        let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
         
+        // Priority 1: Look for amounts on lines containing "Total" or similar keywords
+        let totalKeywords = ["total", "grand total", "amount due", "balance", "sum", "final", "charge", "paid"]
         var foundAmount: String?
         var foundAmountValue: Double = 0
         
-        // Try patterns in order of specificity
-        for pattern in amountPatterns {
-            if let match = firstMatch(in: text, pattern: pattern) {
-                // Clean the amount string
-                var cleanAmount = match.trimmingCharacters(in: .whitespaces)
-                // Remove commas and spaces from number
-                cleanAmount = cleanAmount.replacingOccurrences(of: "[,\\s]", with: "", options: .regularExpression)
+        for line in lines {
+            let lineLower = line.lowercased()
+            
+            // Check if this line contains a "Total" keyword
+            let containsTotalKeyword = totalKeywords.contains { keyword in
+                lineLower.contains(keyword)
+            }
+            
+            if containsTotalKeyword {
+                print("🔍 Found 'Total' line: '\(line)'")
                 
-                if let value = Double(cleanAmount), value > 0 {
-                    // Prefer larger amounts (likely totals) and amounts near currency symbols/labels
-                    if value > foundAmountValue || foundAmount == nil {
+                // Try to extract amount from this specific line
+                // Pattern 1: Currency symbol before amount: Total: $12.34, Total $1,234.56
+                let pattern1 = "(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)"
+                if let match = firstMatch(in: line, pattern: pattern1) {
+                    var cleanAmount = match.trimmingCharacters(in: .whitespaces)
+                    cleanAmount = cleanAmount.replacingOccurrences(of: "[,\\s]", with: "", options: .regularExpression)
+                    
+                    if let value = Double(cleanAmount), value > 0 {
                         foundAmount = cleanAmount
                         foundAmountValue = value
-                        print("✅ Found amount candidate: \(cleanAmount) (value: \(value))")
-                        
-                        // If this pattern had a currency indicator, use it
-                        if pattern.contains("USD|EUR") || pattern.contains("[$€£") {
-                            break // Found amount with currency, use it
+                        print("✅ Extracted amount from Total line: \(cleanAmount) (value: \(value))")
+                        break // Found it, stop searching
+                    }
+                }
+                
+                // Pattern 2: Amount after keyword: Total: 12.34, Total 1,234.56
+                let pattern2 = "(?i)(?:Total|Grand Total|Amount Due|Balance|Sum|Final|Charge|Paid)[:\\s]+(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)?\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)"
+                if let match = firstMatch(in: line, pattern: pattern2) {
+                    var cleanAmount = match.trimmingCharacters(in: .whitespaces)
+                    cleanAmount = cleanAmount.replacingOccurrences(of: "[,\\s]", with: "", options: .regularExpression)
+                    
+                    if let value = Double(cleanAmount), value > 0 {
+                        foundAmount = cleanAmount
+                        foundAmountValue = value
+                        print("✅ Extracted amount from Total line (pattern 2): \(cleanAmount) (value: \(value))")
+                        break // Found it, stop searching
+                    }
+                }
+                
+                // Pattern 3: Just find any number on this line (fallback for Total line)
+                let pattern3 = "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)"
+                if let match = firstMatch(in: line, pattern: pattern3) {
+                    var cleanAmount = match.trimmingCharacters(in: .whitespaces)
+                    cleanAmount = cleanAmount.replacingOccurrences(of: "[,\\s]", with: "", options: .regularExpression)
+                    
+                    if let value = Double(cleanAmount), value > 0 {
+                        foundAmount = cleanAmount
+                        foundAmountValue = value
+                        print("✅ Extracted amount from Total line (pattern 3): \(cleanAmount) (value: \(value))")
+                        break // Found it, stop searching
+                    }
+                }
+            }
+        }
+        
+        // Priority 2: If no Total line found, try other patterns in the full text
+        if foundAmount == nil {
+            print("⚠️ No amount found on 'Total' line, trying other patterns...")
+            
+            let amountPatterns = [
+                // Total with currency symbol before: $12.34, $1,234.56, $ 12.34
+                "(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)",
+                // Total with currency symbol after: 12.34 USD, 1,234.56 EUR
+                "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)\\s*(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD))",
+                // Total with label: Total: $12.34, Amount: 45.67, Sum: 123.45
+                "(?i)(?:Total|Amount|Sum|Subtotal|Grand Total|Balance|Due|Paid|Charge)[:\\s]*(?:[$€£¥₹₽₩₪]|C\\$|A\\$|R\\$|NZ\\$|S\\$|HK\\$)?\\s*([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)",
+                // Just amounts that look like totals (larger numbers, often at end of receipt)
+                "([0-9]{1,3}(?:[,\\s][0-9]{3})*(?:\\.[0-9]{1,2})?)\\s*(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|SEK|INR|RUB|KRW|ILS|BRL|NZD|SGD|HKD)?"
+            ]
+            
+            // Try patterns in order of specificity
+            for pattern in amountPatterns {
+                if let match = firstMatch(in: text, pattern: pattern) {
+                    // Clean the amount string
+                    var cleanAmount = match.trimmingCharacters(in: .whitespaces)
+                    // Remove commas and spaces from number
+                    cleanAmount = cleanAmount.replacingOccurrences(of: "[,\\s]", with: "", options: .regularExpression)
+                    
+                    if let value = Double(cleanAmount), value > 0 {
+                        // Prefer larger amounts (likely totals) and amounts near currency symbols/labels
+                        if value > foundAmountValue || foundAmount == nil {
+                            foundAmount = cleanAmount
+                            foundAmountValue = value
+                            print("✅ Found amount candidate: \(cleanAmount) (value: \(value))")
+                            
+                            // If this pattern had a currency indicator, use it
+                            if pattern.contains("USD|EUR") || pattern.contains("[$€£") {
+                                break // Found amount with currency, use it
+                            }
                         }
                     }
                 }

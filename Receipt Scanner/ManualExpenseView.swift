@@ -56,7 +56,6 @@ struct ManualExpenseView: View {
     @State private var showReceiptViewer: Bool = false
     
     // Sheet toggles
-    @State private var showCurrencySheet: Bool = false
     @State private var showCategorySheet: Bool = false
     @State private var showPaymentSheet: Bool = false
     @State private var showSavedAlert: Bool = false
@@ -184,9 +183,9 @@ struct ManualExpenseView: View {
                 }
                 .padding(.horizontal, 16)
                 
-                // Single gray pad with all editable fields
+                // Editable fields container
                 VStack(alignment: .leading, spacing: 16) {
-                    // Field 1 - Merchant Name (white rounded field with example)
+                    // Field 1 - Merchant Name
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Merchant Name")
                             .font(.headline)
@@ -208,7 +207,7 @@ struct ManualExpenseView: View {
                             .labelsHidden()
                     }
                     
-                    // Field 3 - Total + Currency (white rounded field with example)
+                    // Field 3 - Total + Currency
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Total")
                             .font(.headline)
@@ -220,16 +219,17 @@ struct ManualExpenseView: View {
                                 .padding(12)
                                 .background(themeManager.textFieldBackgroundColor)
                                 .cornerRadius(8)
-                            Button(action: { showCurrencySheet = true }) {
-                                HStack(spacing: 6) {
-                                    Text(selectedCurrency.flag)
-                                    Text(selectedCurrency.code)
-                                        .foregroundColor(.accentColor)
+                            Menu {
+                                ForEach(currencies, id: \.id) { currency in
+                                    Button(action: { selectedCurrency = currency }) {
+                                        Label("\(currency.flag) \(currency.code)", systemImage: selectedCurrency == currency ? "checkmark.circle.fill" : "circle")
+                                    }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
+                            } label: {
+                                FilterMenuLabel(
+                                    title: "\(selectedCurrency.flag) \(selectedCurrency.code)",
+                                    count: 0
+                                )
                             }
                         }
                     }
@@ -283,7 +283,7 @@ struct ManualExpenseView: View {
                             .labelsHidden()
                     }
                     
-                    // Field 7 - Tag (white rounded field with example)
+                    // Field 7 - Tag
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tag")
                             .font(.headline)
@@ -303,7 +303,7 @@ struct ManualExpenseView: View {
                         .cornerRadius(8)
                     }
                     
-                    // Field 8 - Notes (white rounded field with example)
+                    // Field 8 - Notes
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes")
                             .font(.headline)
@@ -336,9 +336,6 @@ struct ManualExpenseView: View {
                     }
                     .padding(.top, 8)
                 }
-                .padding(16)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(16)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
@@ -377,9 +374,6 @@ struct ManualExpenseView: View {
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(selectedImage: $attachedImage)
-        }
-        .sheet(isPresented: $showCurrencySheet) {
-            CurrencyPickerView(selected: $selectedCurrency, isPresented: $showCurrencySheet, themeManager: themeManager)
         }
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) { }

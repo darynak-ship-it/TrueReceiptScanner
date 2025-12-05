@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="true" userDefinedModelVersionIdentifier="">
     <entity name="Receipt" representedClassName="Receipt" syncable="YES" codeGenerationType="class">
-        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO" defaultValueString="00000000-0000-0000-0000-000000000000"/>
         <attribute name="merchantName" optional="YES" attributeType="String"/>
         <attribute name="amount" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="currency" optional="YES" attributeType="String" defaultValueString="USD"/>
-        <attribute name="date" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="category" optional="YES" attributeType="String" defaultValueString="Other"/>
         <attribute name="categoryEmoji" optional="YES" attributeType="String" defaultValueString="🗂️"/>
         <attribute name="paymentMethod" optional="YES" attributeType="String" defaultValueString="Other"/>
@@ -16,8 +16,8 @@
         <attribute name="imageURL" optional="YES" attributeType="URI"/>
         <attribute name="thumbnailURL" optional="YES" attributeType="URI"/>
         <attribute name="recognizedText" optional="YES" attributeType="String"/>
-        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="isManualEntry" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="compressionType" optional="YES" attributeType="String" defaultValueString="none"/>
         <attribute name="originalFileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
@@ -25,11 +25,11 @@
         <attribute name="compressionRatio" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
     </entity>
     <entity name="Report" representedClassName="Report" syncable="YES" codeGenerationType="class">
-        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="title" optional="NO" attributeType="String"/>
-        <attribute name="type" optional="NO" attributeType="String"/>
-        <attribute name="fileURL" optional="NO" attributeType="URI"/>
-        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO" defaultValueString="00000000-0000-0000-0000-000000000000"/>
+        <attribute name="title" optional="NO" attributeType="String" defaultValueString=""/>
+        <attribute name="type" optional="NO" attributeType="String" defaultValueString=""/>
+        <attribute name="fileURL" optional="NO" attributeType="URI" defaultValueString="file:///"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="receiptCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
     </entity>

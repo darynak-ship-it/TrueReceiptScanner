@@ -18,6 +18,23 @@ struct ImageCropView: View {
     @State private var imageDisplaySize: CGSize = .zero
     @State private var imageDisplayOrigin: CGPoint = .zero
     @State private var isDetecting: Bool = true
+    @State private var rotationAngle: CGFloat = 0 // Rotation in degrees (0, 90, 180, 270)
+    @State private var cachedRotatedImage: UIImage?
+    
+    private var rotatedImage: UIImage {
+        // Use cached image if rotation hasn't changed, otherwise compute on background
+        if rotationAngle == 0 {
+            return image
+        }
+        
+        // Return cached image if available and rotation matches
+        if let cached = cachedRotatedImage {
+            return cached
+        }
+        
+        // For initial load, return original image and rotate in background
+        return image
+    }
     
     var body: some View {
         NavigationStack {
@@ -26,7 +43,7 @@ struct ImageCropView: View {
                     Color.black.ignoresSafeArea()
                     
                     // Image display (non-interactive, crop overlay handles interaction)
-                    Image(uiImage: image)
+                    Image(uiImage: rotatedImage)
                         .resizable()
                         .scaledToFit()
                         .onAppear {
@@ -35,12 +52,31 @@ struct ImageCropView: View {
                         .onChange(of: geometry.size) { _ in
                             calculateImageDisplaySize(in: geometry.size)
                         }
+                        .onChange(of: rotationAngle) { newAngle in
+                            // Rotate image on background thread to prevent blocking
+                            if newAngle != 0 {
+                                DispatchQueue.global(qos: .userInitiated).async {
+                                    let rotated = self.image.rotated(by: newAngle)
+                                    DispatchQueue.main.async {
+                                        self.cachedRotatedImage = rotated
+                                        // Recalculate display size when rotated
+                                        self.calculateImageDisplaySize(in: geometry.size)
+                                        // Reset crop rect to default after rotation
+                                        self.setupDefaultCropRect()
+                                    }
+                                }
+                            } else {
+                                cachedRotatedImage = nil
+                                calculateImageDisplaySize(in: geometry.size)
+                                setupDefaultCropRect()
+                            }
+                        }
                     
                     // Crop overlay
                     if !isDetecting {
                         CropOverlayView(
                             cropRect: $cropRect,
-                            imageSize: image.size,
+                            imageSize: (cachedRotatedImage ?? image).size,
                             imageDisplaySize: imageDisplaySize,
                             imageDisplayOrigin: imageDisplayOrigin,
                             containerSize: geometry.size
@@ -65,7 +101,27 @@ struct ImageCropView: View {
                         .foregroundColor(.accentColor)
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Rotate left button
+                    Button(action: {
+                        rotationAngle = (rotationAngle - 90).truncatingRemainder(dividingBy: 360)
+                        if rotationAngle < 0 {
+                            rotationAngle += 360
+                        }
+                    }) {
+                        Image(systemName: "rotate.left")
+                            .foregroundColor(.accentColor)
+                    }
+                    
+                    // Rotate right button
+                    Button(action: {
+                        rotationAngle = (rotationAngle + 90).truncatingRemainder(dividingBy: 360)
+                    }) {
+                        Image(systemName: "rotate.right")
+                            .foregroundColor(.accentColor)
+                    }
+                    
+                    // Done button
                     Button("Done") {
                         cropImage()
                     }
@@ -74,13 +130,20 @@ struct ImageCropView: View {
                 }
             }
             .onAppear {
+                // Initialize crop rect if not set
+                if cropRect == .zero {
+                    setupDefaultCropRect()
+                }
                 detectReceiptArea()
             }
         }
     }
     
     private func calculateImageDisplaySize(in containerSize: CGSize) {
-        let imageAspect = image.size.width / image.size.height
+        // Use rotated image size for display calculations
+        // For initial calculation, use original image size (rotation will update later)
+        let currentImage = cachedRotatedImage ?? image
+        let imageAspect = currentImage.size.width / currentImage.size.height
         let containerAspect = containerSize.width / containerSize.height
         
         if imageAspect > containerAspect {
@@ -97,13 +160,13 @@ struct ImageCropView: View {
     private func detectReceiptArea() {
         guard let cgImage = image.cgImage else {
             DispatchQueue.main.async {
-                setupDefaultCropRect()
+                self.setupDefaultCropRect()
             }
             return
         }
         
         DispatchQueue.main.async {
-            isDetecting = true
+            self.isDetecting = true
         }
         
         var requestCompleted = false
@@ -116,7 +179,9 @@ struct ImageCropView: View {
         // This prevents freezing on large images like 4032x3024
         let maxDimension: CGFloat = 1024
         
+        // In SwiftUI, structs don't create retain cycles, so weak references aren't needed
         DispatchQueue.global(qos: .userInitiated).async {
+            
             // Calculate scale and create downscaled image on background thread
             let scale: CGFloat
             if originalSize.width > originalSize.height {
@@ -138,6 +203,9 @@ struct ImageCropView: View {
             }
             
             print("Downscaled image from \(originalSize) to \(scaledSize) for Vision detection")
+            
+            // Capture originalSize for use in closure
+            let capturedOriginalSize = originalSize
             
             let request = VNDetectRectanglesRequest { request, error in
                 lock.lock()
@@ -167,8 +235,8 @@ struct ImageCropView: View {
                     // Vision uses normalized coordinates (0-1) with origin at bottom-left
                     // UIImage uses origin at top-left
                     // Scale coordinates back to original image size
-                    let imageWidth = originalSize.width
-                    let imageHeight = originalSize.height
+                    let imageWidth = capturedOriginalSize.width
+                    let imageHeight = capturedOriginalSize.height
                     
                     // Convert normalized coordinates to scaled image coordinates, then scale up
                     let topLeft = CGPoint(
@@ -231,8 +299,8 @@ struct ImageCropView: View {
                 }
             }
             
-            // Schedule timeout (3 seconds max for detection - reduced since we're using smaller image)
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3.0, execute: timeoutWorkItem)
+            // Schedule timeout (2.5 seconds max for detection - reduced since we're using smaller image)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 2.5, execute: timeoutWorkItem)
             
             do {
                 try handler.perform([request])
@@ -263,25 +331,27 @@ struct ImageCropView: View {
     }
     
     private func setupDefaultCropRect() {
-        // Set initial crop rect to center 80% of image
-        let cropWidth = image.size.width * 0.8
-        let cropHeight = image.size.height * 0.8
-        let cropX = (image.size.width - cropWidth) / 2
-        let cropY = (image.size.height - cropHeight) / 2
+        // Set initial crop rect to center 80% of rotated image
+        let currentImage = cachedRotatedImage ?? image
+        let cropWidth = currentImage.size.width * 0.8
+        let cropHeight = currentImage.size.height * 0.8
+        let cropX = (currentImage.size.width - cropWidth) / 2
+        let cropY = (currentImage.size.height - cropHeight) / 2
         
         cropRect = CGRect(x: cropX, y: cropY, width: cropWidth, height: cropHeight)
     }
     
     private func cropImage() {
-        // Crop the image using the crop rect
-        guard let cgImage = image.cgImage else {
+        // Use the rotated image for cropping
+        let currentImage = cachedRotatedImage ?? image
+        guard let cgImage = currentImage.cgImage else {
             print("Failed to get CGImage")
             onCancel()
             return
         }
         
         // Ensure crop rect is within image bounds
-        let boundedRect = cropRect.intersection(CGRect(origin: .zero, size: image.size))
+        let boundedRect = cropRect.intersection(CGRect(origin: .zero, size: currentImage.size))
         
         guard boundedRect.width > 0 && boundedRect.height > 0 else {
             print("Invalid crop rect")
@@ -295,8 +365,8 @@ struct ImageCropView: View {
             return
         }
         
-        let croppedImage = UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
-        print("Successfully cropped image: \(croppedImage.size)")
+        let croppedImage = UIImage(cgImage: croppedCGImage, scale: currentImage.scale, orientation: currentImage.imageOrientation)
+        print("Successfully cropped and rotated image: \(croppedImage.size)")
         onCrop(croppedImage)
     }
 }
@@ -448,11 +518,24 @@ struct CropOverlayView: View {
     
     private func resizeCropRect(handle: CropResizeHandle, translation: CGSize, start: CGPoint, displayRect: CGRect) {
         // Convert display coordinates to image coordinates
+        // Ensure we have valid display size to avoid division by zero
+        guard imageDisplaySize.width > 0 && imageDisplaySize.height > 0 else {
+            print("Invalid imageDisplaySize, skipping resize")
+            return
+        }
+        
         let scaleX = imageSize.width / imageDisplaySize.width
         let scaleY = imageSize.height / imageDisplaySize.height
         
         // Use last crop rect as base to prevent cumulative errors
-        var newRect = lastCropRect
+        // Initialize lastCropRect if it's zero (first time)
+        var baseRect = lastCropRect
+        if baseRect == .zero {
+            baseRect = cropRect
+            lastCropRect = cropRect
+        }
+        
+        var newRect = baseRect
         let deltaX = translation.width * scaleX
         let deltaY = translation.height * scaleY
         
@@ -498,11 +581,23 @@ struct CropOverlayView: View {
     }
     
     private func moveCropRect(translation: CGSize, displayRect: CGRect) {
+        // Ensure we have valid display size to avoid division by zero
+        guard imageDisplaySize.width > 0 && imageDisplaySize.height > 0 else {
+            print("Invalid imageDisplaySize, skipping move")
+            return
+        }
+        
         let scaleX = imageSize.width / imageDisplaySize.width
         let scaleY = imageSize.height / imageDisplaySize.height
         
-        // Use last crop rect as base to prevent cumulative errors
-        var newRect = lastCropRect
+        // Initialize lastCropRect if it's zero (first time)
+        var baseRect = lastCropRect
+        if baseRect == .zero {
+            baseRect = cropRect
+            lastCropRect = cropRect
+        }
+        
+        var newRect = baseRect
         newRect.origin.x += translation.width * scaleX
         newRect.origin.y += translation.height * scaleY
         
@@ -530,6 +625,48 @@ struct CropHandleView: View {
                     .stroke(Color.accentColor, lineWidth: 2)
             )
             .shadow(radius: 2)
+    }
+}
+
+// MARK: - UIImage Rotation Extension
+
+extension UIImage {
+    func rotated(by degrees: CGFloat) -> UIImage {
+        // Convert degrees to radians
+        let radians = degrees * .pi / 180
+        
+        // Calculate the size of the rotated image
+        let rotatedSize = CGRect(origin: .zero, size: size)
+            .applying(CGAffineTransform(rotationAngle: radians))
+            .integral.size
+        
+        // Create a graphics context
+        UIGraphicsBeginImageContextWithOptions(rotatedSize, false, scale)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else {
+            return self
+        }
+        
+        // Move origin to center
+        context.translateBy(x: rotatedSize.width / 2, y: rotatedSize.height / 2)
+        
+        // Rotate
+        context.rotate(by: radians)
+        
+        // Draw the image
+        draw(in: CGRect(
+            x: -size.width / 2,
+            y: -size.height / 2,
+            width: size.width,
+            height: size.height
+        ))
+        
+        guard let rotatedImage = UIGraphicsGetImageFromCurrentImageContext() else {
+            return self
+        }
+        
+        return rotatedImage
     }
 }
 

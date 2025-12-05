@@ -6,6 +6,7 @@
 //
 
 import CoreData
+import CloudKit
 
 struct PersistenceController {
     static let shared = PersistenceController()
@@ -51,9 +52,15 @@ struct PersistenceController {
     }()
 
     let container: NSPersistentContainer
+    private var isCloudKitEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+    }
 
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "Receipt_Scanner")
+        // Always use NSPersistentCloudKitContainer for CloudKit support
+        // It works as a regular container when CloudKit is not configured
+        let cloudKitContainer = NSPersistentCloudKitContainer(name: "Receipt_Scanner")
+        container = cloudKitContainer
         
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
@@ -62,6 +69,16 @@ struct PersistenceController {
             let storeDescription = container.persistentStoreDescriptions.first
             storeDescription?.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             storeDescription?.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+            
+            // Configure CloudKit if enabled
+            if isCloudKitEnabled {
+                // Use the container identifier matching the bundle identifier
+                let containerIdentifier = "iCloud.com.darynakalnichenko.app.Receipt-Scanner"
+                storeDescription?.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: containerIdentifier)
+            } else {
+                // Remove CloudKit options if disabled
+                storeDescription?.cloudKitContainerOptions = nil
+            }
         }
         
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
@@ -84,6 +101,13 @@ struct PersistenceController {
         
         // Enable background context for heavy operations
         container.viewContext.undoManager = nil
+    }
+    
+    /// Reinitializes the container with CloudKit enabled/disabled
+    func reconfigureContainer() {
+        // Note: This is a simplified approach. In production, you might want to migrate data
+        // when toggling CloudKit on/off. For now, we'll just update the configuration.
+        // The actual reconfiguration happens on next app launch or container recreation.
     }
     
     // MARK: - Background Context for Heavy Operations

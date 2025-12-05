@@ -1,0 +1,128 @@
+{
+  "source": "/Users/darynakalnichenko/Documents/Receipt Scanner/Receipt Scanner/SupportView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Email",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "Contact Support",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "We're here to help! Send us your questions or feedback.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "How can we help?",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "Subject",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "Brief description of your issue",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "Message",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 49
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please describe your issue in detail...",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 61
+        }
+      },
+      {
+        "comment": "",
+        "key": "Common Issues",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 75
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Email",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 111
+        }
+      },
+      {
+        "comment": "",
+        "key": "Alternative Contact",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "You can also email us directly if you prefer.",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "Email: smthisbrewing@gmail.com",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 132
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 150
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 164
+        }
+      }
+    ]
+  },
+  "version": 1
+}

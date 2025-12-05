@@ -88,7 +88,7 @@ struct ReportLayoutView: View {
                 
                 Spacer()
                 
-                Text(formatAmount(totalAmount))
+                Text(formatAmount(totalAmount, currency: primaryCurrency))
                     .font(.title2.bold())
                     .foregroundColor(.accentColor)
             }
@@ -179,7 +179,7 @@ struct ReportLayoutView: View {
                 
                 HStack(spacing: 0) {
                     tableDataCell("TOTAL", width: .infinity, fontWeight: .bold)
-                    tableDataCell(formatAmount(totalAmount), width: 120, alignment: .trailing, fontWeight: .bold)
+                    tableDataCell(formatAmount(totalAmount, currency: primaryCurrency), width: 120, alignment: .trailing, fontWeight: .bold)
                 }
                 .background(Color.accentColor.opacity(0.15))
             }
@@ -273,6 +273,30 @@ struct ReportLayoutView: View {
         receipts.reduce(0) { $0 + $1.amount }
     }
     
+    private var primaryCurrency: String {
+        guard !receipts.isEmpty else { return "USD" }
+        
+        // Get all currencies from receipts
+        let currencies = receipts.compactMap { $0.currency }.filter { !$0.isEmpty }
+        guard !currencies.isEmpty else { return "USD" }
+        
+        // If all receipts have the same currency, use it
+        let uniqueCurrencies = Set(currencies)
+        if uniqueCurrencies.count == 1 {
+            return currencies.first ?? "USD"
+        }
+        
+        // If mixed currencies, use the most common one
+        let currencyCounts = Dictionary(grouping: currencies, by: { $0 })
+            .mapValues { $0.count }
+        
+        if let mostCommon = currencyCounts.max(by: { $0.value < $1.value }) {
+            return mostCommon.key
+        }
+        
+        return "USD"
+    }
+    
     private var dateRangeText: String {
         guard !receipts.isEmpty else { return "—" }
         
@@ -299,7 +323,29 @@ struct ReportLayoutView: View {
     }
     
     private func currencyForCategory(_ category: String) -> String {
-        receipts.first(where: { ($0.category ?? "Other") == category })?.currency ?? "USD"
+        // Find receipts in this category and determine their currency
+        let categoryReceipts = receipts.filter { ($0.category ?? "Other") == category }
+        guard !categoryReceipts.isEmpty else { return primaryCurrency }
+        
+        // If all receipts in category have same currency, use it
+        let currencies = categoryReceipts.compactMap { $0.currency }.filter { !$0.isEmpty }
+        let uniqueCurrencies = Set(currencies)
+        
+        if uniqueCurrencies.count == 1 {
+            return currencies.first ?? primaryCurrency
+        }
+        
+        // If mixed, use most common in category, or fall back to primary currency
+        if !currencies.isEmpty {
+            let currencyCounts = Dictionary(grouping: currencies, by: { $0 })
+                .mapValues { $0.count }
+            
+            if let mostCommon = currencyCounts.max(by: { $0.value < $1.value }) {
+                return mostCommon.key
+            }
+        }
+        
+        return primaryCurrency
     }
     
     private func formatFullDate(_ date: Date) -> String {

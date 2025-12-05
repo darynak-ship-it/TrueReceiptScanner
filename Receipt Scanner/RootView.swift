@@ -29,6 +29,7 @@ struct RootView: View {
     @State private var isProcessingOCR: Bool = false
     @State private var showImageCrop: Bool = false
     @State private var selectedImageForCrop: UIImage? = nil
+    @State private var isProcessingImage: Bool = false // Prevent multiple simultaneous processing
 
     var body: some View {
         Group {
@@ -103,26 +104,43 @@ struct RootView: View {
                 }
             }
         }
-        .sheet(isPresented: $showImagePicker, onDismiss: {
-            // Handle case where picker is dismissed without selection
-            print("Image picker dismissed")
-        }) {
+        .sheet(isPresented: $showImagePicker) {
             ImagePicker(selectedImage: .constant(nil), onImageSelected: { selectedImage in
-                // Dismiss picker first
-                DispatchQueue.main.async {
-                    showImagePicker = false
+                // Prevent multiple simultaneous processing
+                guard !isProcessingImage else {
+                    print("Image processing already in progress, ignoring duplicate callback")
+                    return
+                }
+                
+                // Close image picker immediately
+                showImagePicker = false
+                
+                guard let image = selectedImage else {
+                    print("No image selected from gallery")
+                    return
+                }
+                
+                print("Image selected from gallery: \(image.size)")
+                
+                // Show crop view for editing (crop and rotation)
+                Task { @MainActor in
+                    // Mark as processing to prevent duplicates
+                    isProcessingImage = true
                     
-                    guard let image = selectedImage else {
-                        print("No image selected from gallery")
+                    // Small delay to ensure picker sheet is fully dismissed
+                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                    
+                    // Double-check picker is closed before showing crop view
+                    guard !showImagePicker else {
+                        print("Warning: Image picker still showing, aborting")
+                        isProcessingImage = false
                         return
                     }
                     
-                    print("Image selected from gallery: \(image.size)")
-                    // Small delay to ensure picker is dismissed before showing crop view
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        selectedImageForCrop = image
-                        showImageCrop = true
-                    }
+                    // Show crop view for editing
+                    selectedImageForCrop = image
+                    showImageCrop = true
+                    isProcessingImage = false
                 }
             })
         }
@@ -131,19 +149,31 @@ struct RootView: View {
                 ImageCropView(
                     image: image,
                     onCrop: { croppedImage in
-                        DispatchQueue.main.async {
-                            showImageCrop = false
-                            selectedImageForCrop = nil
-                            print("Processing cropped image from gallery: \(croppedImage.size)")
-                            // Process the cropped image
-                            processImageFromGallery(croppedImage)
+                        // Prevent duplicate processing
+                        guard !isProcessingImage else {
+                            print("Already processing image, ignoring crop callback")
+                            return
+                        }
+                        
+                        // Close crop view immediately
+                        showImageCrop = false
+                        let imageToProcess = croppedImage
+                        selectedImageForCrop = nil
+                        
+                        print("Processing cropped image from gallery: \(imageToProcess.size)")
+                        
+                        // Process image after sheet dismissal
+                        Task { @MainActor in
+                            isProcessingImage = true
+                            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+                            processImageFromGallery(imageToProcess)
+                            isProcessingImage = false
                         }
                     },
                     onCancel: {
-                        DispatchQueue.main.async {
-                            showImageCrop = false
-                            selectedImageForCrop = nil
-                        }
+                        showImageCrop = false
+                        selectedImageForCrop = nil
+                        isProcessingImage = false
                     }
                 )
             }
@@ -243,61 +273,72 @@ struct RootView: View {
         print("Image size: \(image.size)")
         print("Image scale: \(image.scale)")
         
-        // Show loading indicator
-        DispatchQueue.main.async {
-            self.isProcessingOCR = true
+        // Ensure we're on main thread for state updates
+        Task { @MainActor in
+            // Show loading indicator immediately
+            isProcessingOCR = true
+            
+            // For gallery images, the user has already cropped to select the desired field
+            // Skip ImageProcessor which would detect rectangles and crop again
+            // Directly save the cropped image as-is
+            DispatchQueue.global(qos: .userInitiated).async { [image] in
+                self.saveAndProcessImage(image, originalImage: image)
+            }
+        }
+    }
+    
+    private func processImageOnBackground(_ image: UIImage) {
+        
+        // Use atomic flag for timeout protection
+        let lock = NSLock()
+        var processingCompleted = false
+        
+        // Set a timeout to prevent hanging (5 seconds)
+        let timeoutWorkItem = DispatchWorkItem {
+            lock.lock()
+            defer { lock.unlock() }
+            
+            guard !processingCompleted else { return }
+            processingCompleted = true
+            print("Scanner processing timeout, using original image")
+            
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.saveAndProcessImage(image, originalImage: image)
+            }
         }
         
-        // Process image on background queue (similar to scanner)
-        DispatchQueue.global(qos: .userInitiated).async {
-            // Apply scanner-like processing first (with timeout fallback)
-            print("Applying scanner processing...")
-            var processingCompleted = false
-            let lock = NSLock()
+        // Schedule timeout
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 5.0, execute: timeoutWorkItem)
+        
+        // Start image processing with timeout protection
+        ImageProcessor.processScannedImage(from: image) { processedImage in
+            lock.lock()
+            defer { lock.unlock() }
             
-            // Set a timeout to ensure we don't wait forever (reduced to 8 seconds)
-            let timeoutWorkItem = DispatchWorkItem {
-                lock.lock()
-                defer { lock.unlock() }
-                
-                guard !processingCompleted else { return }
-                processingCompleted = true
-                print("Scanner processing timeout, using original image")
-                
-                // Save original image on background queue
-                DispatchQueue.global(qos: .userInitiated).async {
-                    self.saveAndProcessImage(image, originalImage: image)
-                }
+            guard !processingCompleted else {
+                print("Processing already handled by timeout")
+                return
             }
+            processingCompleted = true
+            timeoutWorkItem.cancel()
             
-            // Schedule timeout
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 8.0, execute: timeoutWorkItem)
-            
-            // Start image processing
-            ImageProcessor.processScannedImage(from: image) { processedImage in
-                lock.lock()
-                defer { lock.unlock() }
-                
-                guard !processingCompleted else { return }
-                processingCompleted = true
-                timeoutWorkItem.cancel()
-                
-                // Ensure we're on background queue for file operations
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let imageToSave = processedImage ?? image
-                    if processedImage == nil {
-                        print("Scanner processing failed, using original image")
-                    } else {
-                        print("Scanner processing completed successfully - image is now black & white scanned-like")
-                    }
-                    // Save the processed image (which is black & white scanned-like)
-                    self.saveAndProcessImage(imageToSave, originalImage: image)
+            // Process on background queue
+            DispatchQueue.global(qos: .userInitiated).async {
+                let imageToSave = processedImage ?? image
+                if processedImage == nil {
+                    print("Scanner processing failed, using original image")
+                } else {
+                    print("Scanner processing completed successfully")
                 }
+                self.saveAndProcessImage(imageToSave, originalImage: image)
             }
         }
     }
     
     private func saveAndProcessImage(_ image: UIImage, originalImage: UIImage? = nil) {
+        // Ensure we're on background queue for file operations
+        assert(!Thread.isMainThread, "saveAndProcessImage should be called on background queue")
+        
         // Save image using ZIP compression (like scanner)
         print("Saving image as ZIP...")
         let result = StorageManager.shared.saveReceiptImageAsZip(image, compressionQuality: 0.7)
@@ -320,7 +361,13 @@ struct RootView: View {
             print("Using fallback JPEG save...")
             let timestamp = Int(Date().timeIntervalSince1970)
             let uuid = UUID().uuidString.prefix(8)
-            let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                print("ERROR: Could not access documents directory")
+                DispatchQueue.main.async {
+                    self.isProcessingOCR = false
+                }
+                return
+            }
             let jpgURL = documentsDir.appendingPathComponent("receipt_\(timestamp)_\(uuid).jpg")
             
             if let data = image.jpegData(compressionQuality: 0.7) {
@@ -367,16 +414,32 @@ struct RootView: View {
         // Perform OCR asynchronously on the processed image (or original if no processing was done)
         print("Starting OCR for gallery image...")
         let imageForOCR = originalImage ?? image // Use original for OCR as it has better text recognition
+        
+        // Perform OCR on background queue with timeout protection
+        // Capture the URL and image for use in the closure
+        let capturedURL = url
+        let capturedImage = image
+        
         OCRTextRecognizer.recognizeText(from: imageForOCR) { text in
             print("OCR completed for gallery image")
+            // Ensure state updates happen on main thread
             DispatchQueue.main.async {
-                print("Setting scannedImageURL to: \(url.path)")
-                print("Image size: \(image.size)")
-                self.scannedImageURL = url
+                print("Setting scannedImageURL to: \(capturedURL.path)")
+                print("Image size: \(capturedImage.size)")
+                
+                // Update state properties - SwiftUI will handle these safely
+                self.scannedImageURL = capturedURL
                 self.recognizedText = text ?? ""
                 self.isProcessingOCR = false
+                
                 print("=== Gallery image processing complete ===")
                 print("scannedImageURL is now: \(String(describing: self.scannedImageURL?.path))")
+                
+                // Verify state was updated correctly
+                if self.scannedImageURL == nil {
+                    print("ERROR: scannedImageURL is still nil after processing!")
+                    self.isProcessingOCR = false
+                }
             }
         }
     }
